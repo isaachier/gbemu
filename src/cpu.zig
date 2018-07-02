@@ -125,6 +125,10 @@ test "Registers" {
 }
 
 pub const Memory = struct {
+    pub const ErrorSet = error{
+        InvalidAddress,
+    };
+
     const memory_len = 0xffff - 0x2000;
 
     allocator: *std.mem.Allocator,
@@ -141,26 +145,29 @@ pub const Memory = struct {
         self.allocator.free(self.memory);
     }
 
-    fn internalIndex(index: u16) u16 {
+    fn internalIndex(index: u16) !u16 {
+        if (index > 0xffff) {
+            return ErrorSet.InvalidAddress;
+        }
         if (index < 0xe000) {
             return index;
         }
         return index - 0x2000;
     }
 
-    pub fn get(self: *const Memory, index: u16) u8 {
-        return self.memory[internalIndex(index)];
+    pub fn get(self: *const Memory, index: u16) !u8 {
+        return self.memory[try internalIndex(index)];
     }
 
-    pub fn set(self: *Memory, index: u16, value: u8) void {
-        self.memory[internalIndex(index)] = value;
+    pub fn set(self: *Memory, index: u16, value: u8) !void {
+        self.memory[try internalIndex(index)] = value;
     }
 
 };
 
-pub const ErrorSet = error{ InvalidInstruction };
-
 pub const CPU = struct {
+    pub const ErrorSet = error{ InvalidInstruction, };
+
     registers: Registers,
     memory: Memory,
 
@@ -176,37 +183,37 @@ pub const CPU = struct {
     }
 
     pub fn execute(self: *CPU) !void {
-        switch (self.memory.get(self.registers.pc)) {
+        switch (try self.memory.get(self.registers.pc)) {
             // 8-Bit Loads
             // Immediate value loads
             0x06 => {
                 // LD B,n
-                self.registers.setB(self.memory.get(self.registers.pc + 1));
+                self.registers.setB(try self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
             },
             0x0E => {
                 // LD C,n
-                self.registers.setC(self.memory.get(self.registers.pc + 1));
+                self.registers.setC(try self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
             },
             0x16 => {
                 // LD D,n
-                self.registers.setD(self.memory.get(self.registers.pc + 1));
+                self.registers.setD(try self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
             },
             0x1E => {
                 // LD E,n
-                self.registers.setE(self.memory.get(self.registers.pc + 1));
+                self.registers.setE(try self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
             },
             0x26 => {
                 // LD H,n
-                self.registers.setH(self.memory.get(self.registers.pc + 1));
+                self.registers.setH(try self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
             },
             0x2E => {
                 // LD L,n
-                self.registers.setL(self.memory.get(self.registers.pc + 1));
+                self.registers.setL(try self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
             },
             // Register loads
@@ -247,7 +254,7 @@ pub const CPU = struct {
             },
             0x7E => {
                 // LD A,(HL)
-                self.registers.setA(self.memory.get(self.registers.hl));
+                self.registers.setA(try self.memory.get(self.registers.hl));
                 self.registers.pc += 1;
             },
             else => {
@@ -261,8 +268,8 @@ test "CPU" {
     var cpu = try CPU.init(std.debug.global_allocator);
     cpu.registers.pc = 0;
     cpu.registers.hl = 0x55;
-    cpu.memory.set(0x0, 0x7E);
-    cpu.memory.set(0x55, 0x20);
+    try cpu.memory.set(0x0, 0x7E);
+    try cpu.memory.set(0x55, 0x20);
     try cpu.execute();
     std.debug.warn("a = {x}\n", cpu.registers.a());
     std.debug.assert(cpu.registers.a() == 0x20);
