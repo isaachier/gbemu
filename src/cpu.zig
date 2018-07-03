@@ -91,32 +91,32 @@ pub const Registers = struct {
 
 test "Registers" {
     var registers : Registers = undefined;
-    registers.af = 0xff11;
-    std.debug.assert(registers.a() == 0xff);
+    registers.af = 0xFF11;
+    std.debug.assert(registers.a() == 0xFF);
     std.debug.assert(registers.f() == 0x11);
     registers.setA(0x11);
     registers.setF(0x55);
     std.debug.assert(registers.a() == 0x11);
     std.debug.assert(registers.f() == 0x55);
 
-    registers.bc = 0xff11;
-    std.debug.assert(registers.b() == 0xff);
+    registers.bc = 0xFF11;
+    std.debug.assert(registers.b() == 0xFF);
     std.debug.assert(registers.c() == 0x11);
     registers.setB(0x11);
     registers.setC(0x55);
     std.debug.assert(registers.b() == 0x11);
     std.debug.assert(registers.c() == 0x55);
 
-    registers.de = 0xff11;
-    std.debug.assert(registers.d() == 0xff);
+    registers.de = 0xFF11;
+    std.debug.assert(registers.d() == 0xFF);
     std.debug.assert(registers.e() == 0x11);
     registers.setD(0x11);
     registers.setE(0x55);
     std.debug.assert(registers.d() == 0x11);
     std.debug.assert(registers.e() == 0x55);
 
-    registers.hl = 0xff11;
-    std.debug.assert(registers.h() == 0xff);
+    registers.hl = 0xFF11;
+    std.debug.assert(registers.h() == 0xFF);
     std.debug.assert(registers.l() == 0x11);
     registers.setH(0x11);
     registers.setL(0x55);
@@ -125,11 +125,7 @@ test "Registers" {
 }
 
 pub const Memory = struct {
-    pub const ErrorSet = error{
-        InvalidAddress,
-    };
-
-    const memory_len = 0xffff - 0x2000;
+    const memory_len = 0xFFFF - 0x2000;
 
     allocator: *std.mem.Allocator,
     memory: []u8,
@@ -145,22 +141,19 @@ pub const Memory = struct {
         self.allocator.free(self.memory);
     }
 
-    fn internalIndex(index: u16) !u16 {
-        if (index > 0xffff) {
-            return ErrorSet.InvalidAddress;
-        }
-        if (index < 0xe000) {
+    fn internalIndex(index: u16) u16 {
+        if (index < 0xE000) {
             return index;
         }
         return index - 0x2000;
     }
 
-    pub fn get(self: *const Memory, index: u16) !u8 {
-        return self.memory[try internalIndex(index)];
+    pub fn get(self: *const Memory, index: u16) u8 {
+        return self.memory[internalIndex(index)];
     }
 
-    pub fn set(self: *Memory, index: u16, value: u8) !void {
-        self.memory[try internalIndex(index)] = value;
+    pub fn set(self: *Memory, index: u16, value: u8) void {
+        self.memory[internalIndex(index)] = value;
     }
 
 };
@@ -183,43 +176,364 @@ pub const CPU = struct {
     }
 
     pub fn execute(self: *CPU) !void {
-        switch (try self.memory.get(self.registers.pc)) {
-            // 8-Bit Loads
-            // Immediate value loads
+        switch (self.memory.get(self.registers.pc)) {
+            0x02 => {
+                // LD (BC),A
+                self.memory.set(self.registers.bc, self.registers.a());
+                self.registers.pc += 1;
+            },
             0x06 => {
                 // LD B,n
-                self.registers.setB(try self.memory.get(self.registers.pc + 1));
+                self.registers.setB(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
+            },
+            0x0A => {
+                // LD A,(BC)
+                self.registers.setA(self.memory.get(self.registers.bc));
+                self.registers.pc += 1;
             },
             0x0E => {
                 // LD C,n
-                self.registers.setC(try self.memory.get(self.registers.pc + 1));
+                self.registers.setC(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
+            },
+            0x12 => {
+                // LD (DE),A
+                self.memory.set(self.registers.de, self.registers.a());
+                self.registers.pc += 1;
             },
             0x16 => {
                 // LD D,n
-                self.registers.setD(try self.memory.get(self.registers.pc + 1));
+                self.registers.setD(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
+            },
+            0x1A => {
+                // LD A,(DE)
+                self.registers.setA(self.memory.get(self.registers.de));
+                self.registers.pc += 1;
             },
             0x1E => {
                 // LD E,n
-                self.registers.setE(try self.memory.get(self.registers.pc + 1));
+                self.registers.setE(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
+            },
+            0x22 => {
+                // LDI (HL),A
+                self.memory.set(self.registers.hl, self.registers.a());
+                self.registers.hl += 1;
+                self.registers.pc += 1;
             },
             0x26 => {
                 // LD H,n
-                self.registers.setH(try self.memory.get(self.registers.pc + 1));
+                self.registers.setH(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
+            },
+            0x2A => {
+                // LDI A,(HL)
+                self.registers.setA(self.memory.get(self.registers.hl));
+                self.registers.hl += 1;
+                self.registers.pc += 1;
             },
             0x2E => {
                 // LD L,n
-                self.registers.setL(try self.memory.get(self.registers.pc + 1));
+                self.registers.setL(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
             },
-            // Register loads
-            0x7F => {
-                // LD A,A
-                self.registers.setA(self.registers.a());
+            0x32 => {
+                // LDD (HL),A
+                self.memory.set(self.registers.hl, self.registers.a());
+                self.registers.hl -= 1;
+                self.registers.pc += 1;
+            },
+            0x36 => {
+                // LD (HL),n
+                self.memory.set(self.registers.hl, self.memory.get(self.registers.pc + 1));
+                self.registers.pc += 2;
+            },
+            0x3A => {
+                // LDD A,(HL)
+                self.registers.setA(self.memory.get(self.registers.hl));
+                self.registers.hl -= 1;
+                self.registers.pc += 1;
+            },
+            0x3E => {
+                // LD A,n
+                self.registers.setA(self.memory.get(self.registers.pc + 1));
+                self.registers.pc += 2;
+            },
+            0x40 => {
+                // LD B,B
+                self.registers.setB(self.registers.b());
+                self.registers.pc += 1;
+            },
+            0x41 => {
+                // LD B,C
+                self.registers.setB(self.registers.c());
+                self.registers.pc += 1;
+            },
+            0x42 => {
+                // LD B,D
+                self.registers.setB(self.registers.d());
+                self.registers.pc += 1;
+            },
+            0x43 => {
+                // LD B,E
+                self.registers.setB(self.registers.e());
+                self.registers.pc += 1;
+            },
+            0x44 => {
+                // LD B,H
+                self.registers.setB(self.registers.h());
+                self.registers.pc += 1;
+            },
+            0x45 => {
+                // LD B,L
+                self.registers.setB(self.registers.l());
+                self.registers.pc += 1;
+            },
+            0x46 => {
+                // LD B,(HL)
+                self.registers.setB(self.memory.get(self.registers.hl));
+                self.registers.pc += 1;
+            },
+            0x47 => {
+                // LD B,A
+                self.registers.setB(self.registers.a());
+                self.registers.pc += 1;
+            },
+            0x48 => {
+                // LD C,B
+                self.registers.setC(self.registers.b());
+                self.registers.pc += 1;
+            },
+            0x49 => {
+                // LD C,C
+                self.registers.setC(self.registers.c());
+                self.registers.pc += 1;
+            },
+            0x4A => {
+                // LD C,D
+                self.registers.setC(self.registers.d());
+                self.registers.pc += 1;
+            },
+            0x4B => {
+                // LD C,E
+                self.registers.setC(self.registers.e());
+                self.registers.pc += 1;
+            },
+            0x4C => {
+                // LD C,H
+                self.registers.setC(self.registers.h());
+                self.registers.pc += 1;
+            },
+            0x4D => {
+                // LD C,L
+                self.registers.setC(self.registers.l());
+                self.registers.pc += 1;
+            },
+            0x4E => {
+                // LD C,(HL)
+                self.registers.setC(self.memory.get(self.registers.hl));
+                self.registers.pc += 1;
+            },
+            0x4F => {
+                // LD C,A
+                self.registers.setC(self.registers.a());
+                self.registers.pc += 1;
+            },
+            0x50 => {
+                // LD D,B
+                self.registers.setD(self.registers.b());
+                self.registers.pc += 1;
+            },
+            0x51 => {
+                // LD D,C
+                self.registers.setD(self.registers.c());
+                self.registers.pc += 1;
+            },
+            0x52 => {
+                // LD D,D
+                self.registers.setD(self.registers.d());
+                self.registers.pc += 1;
+            },
+            0x53 => {
+                // LD D,E
+                self.registers.setD(self.registers.e());
+                self.registers.pc += 1;
+            },
+            0x54 => {
+                // LD D,H
+                self.registers.setD(self.registers.h());
+                self.registers.pc += 1;
+            },
+            0x55 => {
+                // LD D,L
+                self.registers.setD(self.registers.l());
+                self.registers.pc += 1;
+            },
+            0x56 => {
+                // LD D,(HL)
+                self.registers.setD(self.memory.get(self.registers.hl));
+                self.registers.pc += 1;
+            },
+            0x57 => {
+                // LD D,A
+                self.registers.setD(self.registers.a());
+                self.registers.pc += 1;
+            },
+            0x58 => {
+                // LD E,B
+                self.registers.setE(self.registers.b());
+                self.registers.pc += 1;
+            },
+            0x59 => {
+                // LD E,C
+                self.registers.setE(self.registers.c());
+                self.registers.pc += 1;
+            },
+            0x5A => {
+                // LD E,D
+                self.registers.setE(self.registers.d());
+                self.registers.pc += 1;
+            },
+            0x5B => {
+                // LD E,E
+                self.registers.setE(self.registers.e());
+                self.registers.pc += 1;
+            },
+            0x5C => {
+                // LD E,H
+                self.registers.setE(self.registers.h());
+                self.registers.pc += 1;
+            },
+            0x5D => {
+                // LD E,L
+                self.registers.setE(self.registers.l());
+                self.registers.pc += 1;
+            },
+            0x5E => {
+                // LD E,(HL)
+                self.registers.setE(self.memory.get(self.registers.hl));
+                self.registers.pc += 1;
+            },
+            0x5F => {
+                // LD E,A
+                self.registers.setE(self.registers.a());
+                self.registers.pc += 1;
+            },
+            0x60 => {
+                // LD H,B
+                self.registers.setH(self.registers.b());
+                self.registers.pc += 1;
+            },
+            0x61 => {
+                // LD H,C
+                self.registers.setH(self.registers.c());
+                self.registers.pc += 1;
+            },
+            0x62 => {
+                // LD H,D
+                self.registers.setH(self.registers.d());
+                self.registers.pc += 1;
+            },
+            0x63 => {
+                // LD H,E
+                self.registers.setH(self.registers.e());
+                self.registers.pc += 1;
+            },
+            0x64 => {
+                // LD H,H
+                self.registers.setH(self.registers.h());
+                self.registers.pc += 1;
+            },
+            0x65 => {
+                // LD H,L
+                self.registers.setH(self.registers.l());
+                self.registers.pc += 1;
+            },
+            0x66 => {
+                // LD H,(HL)
+                self.registers.setH(self.memory.get(self.registers.hl));
+                self.registers.pc += 1;
+            },
+            0x67 => {
+                // LD H,A
+                self.registers.setH(self.registers.a());
+                self.registers.pc += 1;
+            },
+            0x68 => {
+                // LD L,B
+                self.registers.setL(self.registers.b());
+                self.registers.pc += 1;
+            },
+            0x69 => {
+                // LD L,C
+                self.registers.setL(self.registers.c());
+                self.registers.pc += 1;
+            },
+            0x6A => {
+                // LD L,D
+                self.registers.setL(self.registers.d());
+                self.registers.pc += 1;
+            },
+            0x6B => {
+                // LD L,E
+                self.registers.setL(self.registers.e());
+                self.registers.pc += 1;
+            },
+            0x6C => {
+                // LD L,H
+                self.registers.setL(self.registers.h());
+                self.registers.pc += 1;
+            },
+            0x6D => {
+                // LD L,L
+                self.registers.setL(self.registers.l());
+                self.registers.pc += 1;
+            },
+            0x6E => {
+                // LD L,(HL)
+                self.registers.setL(self.memory.get(self.registers.hl));
+                self.registers.pc += 1;
+            },
+            0x6F => {
+                // LD L,A
+                self.registers.setL(self.registers.a());
+                self.registers.pc += 1;
+            },
+            0x70 => {
+                // LD (HL),B
+                self.memory.set(self.registers.hl, self.registers.b());
+                self.registers.pc += 1;
+            },
+            0x71 => {
+                // LD (HL),C
+                self.memory.set(self.registers.hl, self.registers.c());
+                self.registers.pc += 1;
+            },
+            0x72 => {
+                // LD (HL),D
+                self.memory.set(self.registers.hl, self.registers.d());
+                self.registers.pc += 1;
+            },
+            0x73 => {
+                // LD (HL),E
+                self.memory.set(self.registers.hl, self.registers.e());
+                self.registers.pc += 1;
+            },
+            0x74 => {
+                // LD (HL),H
+                self.memory.set(self.registers.hl, self.registers.h());
+                self.registers.pc += 1;
+            },
+            0x75 => {
+                // LD (HL),L
+                self.memory.set(self.registers.hl, self.registers.l());
+                self.registers.pc += 1;
+            },
+            0x77 => {
+                // LD (HL),A
+                self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.pc += 1;
             },
             0x78 => {
@@ -254,8 +568,46 @@ pub const CPU = struct {
             },
             0x7E => {
                 // LD A,(HL)
-                self.registers.setA(try self.memory.get(self.registers.hl));
+                self.registers.setA(self.memory.get(self.registers.hl));
                 self.registers.pc += 1;
+            },
+            0xE0 => {
+                // LDH ($FF00+n),A
+                self.memory.set(u16(0xFF00) | self.memory.get(self.registers.pc + 1),
+                                    self.registers.a());
+                self.registers.pc += 2;
+            },
+            0xE2 => {
+                // LD ($FF00+C),A
+                self.memory.set(u16(0xFF00) | self.registers.c(), self.registers.a());
+                self.registers.pc += 1;
+            },
+            0xEA => {
+                // LD (nn),A
+                const lsb : u8 = self.memory.get(self.registers.pc + 2);
+                const msb : u8 = self.memory.get(self.registers.pc + 1);
+                const address : u16 = u16(lsb) << 8 | msb;
+                self.memory.set(address, self.registers.a());
+                self.registers.pc += 3;
+            },
+            0xF0 => {
+                // LDH A,($FF00+n)
+                const n = self.memory.get(self.registers.pc + 1);
+                self.registers.setA(self.memory.get(u16(0xFF00) | n));
+                self.registers.pc += 2;
+            },
+            0xF2 => {
+                // LD A,($FF00+C)
+                self.registers.setA(self.memory.get(u16(0xFF00) | self.registers.c()));
+                self.registers.pc += 1;
+            },
+            0xFA => {
+                // LD A,(HL)
+                const lsb : u8 = self.memory.get(self.registers.pc + 2);
+                const msb : u8 = self.memory.get(self.registers.pc + 1);
+                const address : u16 = u16(lsb) << 8 | msb;
+                self.registers.setA(self.memory.get(address));
+                self.registers.pc += 3;
             },
             else => {
                 return ErrorSet.InvalidInstruction;
@@ -268,10 +620,9 @@ test "CPU" {
     var cpu = try CPU.init(std.debug.global_allocator);
     cpu.registers.pc = 0;
     cpu.registers.hl = 0x55;
-    try cpu.memory.set(0x0, 0x7E);
-    try cpu.memory.set(0x55, 0x20);
+    cpu.memory.set(0x0, 0x7E);
+    cpu.memory.set(0x55, 0x20);
     try cpu.execute();
-    std.debug.warn("a = {x}\n", cpu.registers.a());
     std.debug.assert(cpu.registers.a() == 0x20);
     std.debug.assert(cpu.registers.pc == 1);
     cpu.deinit();
