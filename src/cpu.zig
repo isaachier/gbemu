@@ -652,76 +652,57 @@ pub const CPU = struct {
             0x7E => {
                 // LD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
-                self.registers.pc += 1;
             },
             0xE0 => {
                 // LDH ($FF00+n),A
-                self.memory.set(u16(0xFF00) | self.memory.get(self.registers.pc + 1),
+                self.memory.set(0xFF00 | u16(try self.stream.readByte()),
                                 self.registers.a());
-                self.registers.pc += 2;
             },
             0xE2 => {
                 // LD ($FF00+C),A
-                self.memory.set(u16(0xFF00) | self.registers.c(), self.registers.a());
-                self.registers.pc += 1;
+                self.memory.set(0xFF00 | u16(self.registers.c()), self.registers.a());
             },
             0xEA => {
                 // LD (nn),A
-                const lsb : u8 = self.memory.get(self.registers.pc + 2);
-                const msb : u8 = self.memory.get(self.registers.pc + 1);
-                const address : u16 = u16(lsb) << 8 | msb;
-                self.memory.set(address, self.registers.a());
-                self.registers.pc += 3;
+                self.memory.set(try self.stream.readIntLe(u16), self.registers.a());
             },
             0xF0 => {
                 // LDH A,($FF00+n)
-                const n = self.memory.get(self.registers.pc + 1);
-                self.registers.setA(self.memory.get(u16(0xFF00) | n));
-                self.registers.pc += 2;
+                self.registers.setA(self.memory.get(0xFF00 | u16(try self.stream.readByte())));
             },
             0xF2 => {
                 // LD A,($FF00+C)
                 self.registers.setA(self.memory.get(u16(0xFF00) | self.registers.c()));
-                self.registers.pc += 1;
             },
             0xF5 => {
-                // PUSH nn
-                
+                // PUSH AF
+                self.memory.set(self.registers.sp, self.registers.a());
+                self.memory.set(self.registers.sp - 1, self.registers.f());
+                self.registers.sp -= 2;
             },
             0xF8 => {
                 // LDHL SP,n
-                const n : u16 = self.memory.get(self.registers.pc + 1);
-                const new_h_value = self.registers.h() + @truncate(u8, (n & 0xFF00) >> 8);
-                const new_l_value = self.registers.l() + (n & 0xFF);
-                var half_carry_flag : bool = undefined;
-                var carry_flag : bool = undefined;
-                if (new_h_value > 0xFF) {
-                    self.registers.setCarryFlag(true);
-                } else {
-                    self.registers.setCarryFlag(false);
-                }
-                if (new_l_value > 0xFF) {
-                    self.registers.setHalfCarryFlag(true);
-                } else {
-                    self.registers.setHalfCarryFlag(false);
-                }
+                const n : u8 = try self.stream.readByte();
+                const lsb = @truncate(u8, self.registers.sp);
+                var result_u8 : u8 = undefined;
+                const half_carry_flag = @addWithOverflow(u8, lsb, n, &result_u8);
+                var result_u16 : u16 = undefined;
+                const carry_flag = @addWithOverflow(u16, self.registers.sp, n, &result_u16);
+                self.registers.setHalfCarryFlag(half_carry_flag);
+                self.registers.setCarryFlag(carry_flag);
                 self.registers.setZeroFlag(false);
                 self.registers.setSubtractFlag(false);
-                self.registers.hl += n;
-                self.registers.pc += 2;
+                self.registers.sp +%= n;
+                self.registers.hl = self.registers.sp;
             },
             0xF9 => {
                 // LD SP,HL
                 self.registers.sp = self.registers.hl;
-                self.registers.pc += 1;
             },
             0xFA => {
                 // LD A,(HL)
-                const lsb : u8 = self.memory.get(self.registers.pc + 2);
-                const msb : u8 = self.memory.get(self.registers.pc + 1);
-                const address : u16 = u16(lsb) << 8 | msb;
+                const address = try self.stream.readIntLe(u16);
                 self.registers.setA(self.memory.get(address));
-                self.registers.pc += 3;
             },
             else => {
                 return ErrorSet.InvalidInstruction;
