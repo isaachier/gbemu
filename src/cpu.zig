@@ -277,377 +277,298 @@ pub const CPU = struct {
             0x1A => {
                 // LD A,(DE)
                 self.registers.setA(self.memory.get(self.registers.de));
-                self.registers.pc += 1;
             },
             0x1E => {
                 // LD E,n
-                self.registers.setE(self.memory.get(self.registers.pc + 1));
-                self.registers.pc += 2;
+                self.registers.setE(try self.stream.readByte());
             },
             0x21 => {
                 // LD HL,nn
-                const lsb : u8 = self.memory.get(self.registers.pc + 2);
-                const msb : u8 = self.memory.get(self.registers.pc + 1);
-                const value = u16(lsb) << 8 | msb;
-                self.registers.hl = value;
-                self.registers.pc += 3;
+                self.registers.hl = try self.stream.readIntLe(u16);
             },
             0x22 => {
                 // LDI (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.hl += 1;
-                self.registers.pc += 1;
             },
             0x26 => {
                 // LD H,n
-                self.registers.setH(self.memory.get(self.registers.pc + 1));
-                self.registers.pc += 2;
+                self.registers.setH(try self.stream.readByte());
             },
             0x2A => {
                 // LDI A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
                 self.registers.hl += 1;
-                self.registers.pc += 1;
             },
             0x2E => {
                 // LD L,n
-                self.registers.setL(self.memory.get(self.registers.pc + 1));
-                self.registers.pc += 2;
+                self.registers.setL(try self.stream.readByte());
             },
             0x31 => {
                 // LD SP,nn
-                const lsb : u8 = self.memory.get(self.registers.pc + 2);
-                const msb : u8 = self.memory.get(self.registers.pc + 1);
-                const value = u16(lsb) << 8 | msb;
-                self.registers.sp = value;
-                self.registers.pc += 3;
+                self.registers.sp = try self.stream.readIntLe(u16);
             },
             0x32 => {
                 // LDD (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.hl -= 1;
-                self.registers.pc += 1;
             },
             0x36 => {
                 // LD (HL),n
-                self.memory.set(self.registers.hl, self.memory.get(self.registers.pc + 1));
-                self.registers.pc += 2;
+                self.memory.set(self.registers.hl, try self.stream.readByte());
             },
             0x3A => {
                 // LDD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
                 self.registers.hl -= 1;
-                self.registers.pc += 1;
             },
             0x3E => {
                 // LD A,n
-                self.registers.setA(self.memory.get(self.registers.pc + 1));
-                self.registers.pc += 2;
+                self.registers.setA(try self.stream.readByte());
             },
             0x40 => {
                 // LD B,B
                 self.registers.setB(self.registers.b());
-                self.registers.pc += 1;
             },
             0x41 => {
                 // LD B,C
                 self.registers.setB(self.registers.c());
-                self.registers.pc += 1;
             },
             0x42 => {
                 // LD B,D
                 self.registers.setB(self.registers.d());
-                self.registers.pc += 1;
             },
             0x43 => {
                 // LD B,E
                 self.registers.setB(self.registers.e());
-                self.registers.pc += 1;
             },
             0x44 => {
                 // LD B,H
                 self.registers.setB(self.registers.h());
-                self.registers.pc += 1;
             },
             0x45 => {
                 // LD B,L
                 self.registers.setB(self.registers.l());
-                self.registers.pc += 1;
             },
             0x46 => {
                 // LD B,(HL)
                 self.registers.setB(self.memory.get(self.registers.hl));
-                self.registers.pc += 1;
             },
             0x47 => {
                 // LD B,A
                 self.registers.setB(self.registers.a());
-                self.registers.pc += 1;
             },
             0x48 => {
                 // LD C,B
                 self.registers.setC(self.registers.b());
-                self.registers.pc += 1;
             },
             0x49 => {
                 // LD C,C
                 self.registers.setC(self.registers.c());
-                self.registers.pc += 1;
             },
             0x4A => {
                 // LD C,D
                 self.registers.setC(self.registers.d());
-                self.registers.pc += 1;
             },
             0x4B => {
                 // LD C,E
                 self.registers.setC(self.registers.e());
-                self.registers.pc += 1;
             },
             0x4C => {
                 // LD C,H
                 self.registers.setC(self.registers.h());
-                self.registers.pc += 1;
             },
             0x4D => {
                 // LD C,L
                 self.registers.setC(self.registers.l());
-                self.registers.pc += 1;
             },
             0x4E => {
                 // LD C,(HL)
                 self.registers.setC(self.memory.get(self.registers.hl));
-                self.registers.pc += 1;
             },
             0x4F => {
                 // LD C,A
                 self.registers.setC(self.registers.a());
-                self.registers.pc += 1;
             },
             0x50 => {
                 // LD D,B
                 self.registers.setD(self.registers.b());
-                self.registers.pc += 1;
             },
             0x51 => {
                 // LD D,C
                 self.registers.setD(self.registers.c());
-                self.registers.pc += 1;
             },
             0x52 => {
                 // LD D,D
                 self.registers.setD(self.registers.d());
-                self.registers.pc += 1;
             },
             0x53 => {
                 // LD D,E
                 self.registers.setD(self.registers.e());
-                self.registers.pc += 1;
             },
             0x54 => {
                 // LD D,H
                 self.registers.setD(self.registers.h());
-                self.registers.pc += 1;
             },
             0x55 => {
                 // LD D,L
                 self.registers.setD(self.registers.l());
-                self.registers.pc += 1;
             },
             0x56 => {
                 // LD D,(HL)
                 self.registers.setD(self.memory.get(self.registers.hl));
-                self.registers.pc += 1;
             },
             0x57 => {
                 // LD D,A
                 self.registers.setD(self.registers.a());
-                self.registers.pc += 1;
             },
             0x58 => {
                 // LD E,B
                 self.registers.setE(self.registers.b());
-                self.registers.pc += 1;
             },
             0x59 => {
                 // LD E,C
                 self.registers.setE(self.registers.c());
-                self.registers.pc += 1;
             },
             0x5A => {
                 // LD E,D
                 self.registers.setE(self.registers.d());
-                self.registers.pc += 1;
             },
             0x5B => {
                 // LD E,E
                 self.registers.setE(self.registers.e());
-                self.registers.pc += 1;
             },
             0x5C => {
                 // LD E,H
                 self.registers.setE(self.registers.h());
-                self.registers.pc += 1;
             },
             0x5D => {
                 // LD E,L
                 self.registers.setE(self.registers.l());
-                self.registers.pc += 1;
             },
             0x5E => {
                 // LD E,(HL)
                 self.registers.setE(self.memory.get(self.registers.hl));
-                self.registers.pc += 1;
             },
             0x5F => {
                 // LD E,A
                 self.registers.setE(self.registers.a());
-                self.registers.pc += 1;
             },
             0x60 => {
                 // LD H,B
                 self.registers.setH(self.registers.b());
-                self.registers.pc += 1;
             },
             0x61 => {
                 // LD H,C
                 self.registers.setH(self.registers.c());
-                self.registers.pc += 1;
             },
             0x62 => {
                 // LD H,D
                 self.registers.setH(self.registers.d());
-                self.registers.pc += 1;
             },
             0x63 => {
                 // LD H,E
                 self.registers.setH(self.registers.e());
-                self.registers.pc += 1;
             },
             0x64 => {
                 // LD H,H
                 self.registers.setH(self.registers.h());
-                self.registers.pc += 1;
             },
             0x65 => {
                 // LD H,L
                 self.registers.setH(self.registers.l());
-                self.registers.pc += 1;
             },
             0x66 => {
                 // LD H,(HL)
                 self.registers.setH(self.memory.get(self.registers.hl));
-                self.registers.pc += 1;
             },
             0x67 => {
                 // LD H,A
                 self.registers.setH(self.registers.a());
-                self.registers.pc += 1;
             },
             0x68 => {
                 // LD L,B
                 self.registers.setL(self.registers.b());
-                self.registers.pc += 1;
             },
             0x69 => {
                 // LD L,C
                 self.registers.setL(self.registers.c());
-                self.registers.pc += 1;
             },
             0x6A => {
                 // LD L,D
                 self.registers.setL(self.registers.d());
-                self.registers.pc += 1;
             },
             0x6B => {
                 // LD L,E
                 self.registers.setL(self.registers.e());
-                self.registers.pc += 1;
             },
             0x6C => {
                 // LD L,H
                 self.registers.setL(self.registers.h());
-                self.registers.pc += 1;
             },
             0x6D => {
                 // LD L,L
                 self.registers.setL(self.registers.l());
-                self.registers.pc += 1;
             },
             0x6E => {
                 // LD L,(HL)
                 self.registers.setL(self.memory.get(self.registers.hl));
-                self.registers.pc += 1;
             },
             0x6F => {
                 // LD L,A
                 self.registers.setL(self.registers.a());
-                self.registers.pc += 1;
             },
             0x70 => {
                 // LD (HL),B
                 self.memory.set(self.registers.hl, self.registers.b());
-                self.registers.pc += 1;
             },
             0x71 => {
                 // LD (HL),C
                 self.memory.set(self.registers.hl, self.registers.c());
-                self.registers.pc += 1;
             },
             0x72 => {
                 // LD (HL),D
                 self.memory.set(self.registers.hl, self.registers.d());
-                self.registers.pc += 1;
             },
             0x73 => {
                 // LD (HL),E
                 self.memory.set(self.registers.hl, self.registers.e());
-                self.registers.pc += 1;
             },
             0x74 => {
                 // LD (HL),H
                 self.memory.set(self.registers.hl, self.registers.h());
-                self.registers.pc += 1;
             },
             0x75 => {
                 // LD (HL),L
                 self.memory.set(self.registers.hl, self.registers.l());
-                self.registers.pc += 1;
             },
             0x77 => {
                 // LD (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
-                self.registers.pc += 1;
             },
             0x78 => {
                 // LD A,B
                 self.registers.setA(self.registers.b());
-                self.registers.pc += 1;
             },
             0x79 => {
                 // LD A,C
                 self.registers.setA(self.registers.c());
-                self.registers.pc += 1;
             },
             0x7A => {
                 // LD A,D
                 self.registers.setA(self.registers.d());
-                self.registers.pc += 1;
             },
             0x7B => {
                 // LD A,E
                 self.registers.setA(self.registers.e());
-                self.registers.pc += 1;
             },
             0x7C => {
                 // LD A,H
                 self.registers.setA(self.registers.h());
-                self.registers.pc += 1;
             },
             0x7D => {
                 // LD A,L
                 self.registers.setA(self.registers.l());
-                self.registers.pc += 1;
             },
             0x7E => {
                 // LD A,(HL)
