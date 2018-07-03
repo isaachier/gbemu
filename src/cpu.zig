@@ -194,7 +194,12 @@ pub const Memory = struct {
         self.memory[internalIndex(index)] = value;
     }
 
-    pub fn slice(self: *const Memory, index: u16, len: usize) []const u8 {
+    pub fn sliceConst(self: *const Memory, index: u16, len: usize) []const u8 {
+        const offset = internalIndex(index);
+        return self.memory[offset..offset + len];
+    }
+
+    pub fn slice(self: *Memory, index: u16, len: usize) []u8 {
         const offset = internalIndex(index);
         return self.memory[offset..offset + len];
     }
@@ -229,9 +234,21 @@ pub const CPU = struct {
         } else {
             len = buffer.len;
         }
-        std.mem.copy(u8, buffer, self.memory.slice(self.registers.pc, len));
-        self.registers.pc += @truncate(u16, len);
+        std.mem.copy(u8, buffer, self.memory.sliceConst(self.registers.pc, len));
+        self.registers.pc +%= @truncate(u16, len);
         return len;
+    }
+
+    fn push(self: *CPU, value: var) void {
+        const len = @sizeOf(@typeOf(value));
+        self.registers.sp -%= len;
+        std.mem.writeInt(self.memory.slice(self.registers.sp, len), value, builtin.Endian.Little);
+    }
+
+    fn pop(self: *CPU, comptime T: type) T {
+        const value = std.mem.readIntLE(T, self.memory.sliceConst(self.registers.sp, @sizeOf(T)));
+        self.registers.sp +%= @sizeOf(T);
+        return value;
     }
 
     pub fn execute(self: *CPU) !void {
@@ -289,7 +306,7 @@ pub const CPU = struct {
             0x22 => {
                 // LDI (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
-                self.registers.hl += 1;
+                self.registers.hl +%= 1;
             },
             0x26 => {
                 // LD H,n
@@ -298,7 +315,7 @@ pub const CPU = struct {
             0x2A => {
                 // LDI A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
-                self.registers.hl += 1;
+                self.registers.hl +%= 1;
             },
             0x2E => {
                 // LD L,n
@@ -311,7 +328,7 @@ pub const CPU = struct {
             0x32 => {
                 // LDD (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
-                self.registers.hl -= 1;
+                self.registers.hl -%= 1;
             },
             0x36 => {
                 // LD (HL),n
@@ -320,7 +337,7 @@ pub const CPU = struct {
             0x3A => {
                 // LDD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
-                self.registers.hl -= 1;
+                self.registers.hl -%= 1;
             },
             0x3E => {
                 // LD A,n
@@ -574,14 +591,38 @@ pub const CPU = struct {
                 // LD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
             },
+            0xC1 => {
+                // POP BC
+                self.registers.bc = self.pop(u16);
+            },
+            0xC5 => {
+                // PUSH BC
+                self.push(self.registers.bc);
+            },
+            0xD1 => {
+                // POP DE
+                self.registers.de = self.pop(u16);
+            },
+            0xD5 => {
+                // PUSH DE
+                self.push(self.registers.de);
+            },
             0xE0 => {
                 // LDH ($FF00+n),A
                 self.memory.set(0xFF00 | u16(try self.stream.readByte()),
                                 self.registers.a());
             },
+            0xE1 => {
+                // POP HL
+                self.registers.hl = self.pop(u16);
+            },
             0xE2 => {
                 // LD ($FF00+C),A
                 self.memory.set(0xFF00 | u16(self.registers.c()), self.registers.a());
+            },
+            0xE5 => {
+                // PUSH HL
+                self.push(self.registers.hl);
             },
             0xEA => {
                 // LD (nn),A
@@ -591,15 +632,17 @@ pub const CPU = struct {
                 // LDH A,($FF00+n)
                 self.registers.setA(self.memory.get(0xFF00 | u16(try self.stream.readByte())));
             },
+            0xF1 => {
+                // POP AF
+                self.registers.af = self.pop(u16);
+            },
             0xF2 => {
                 // LD A,($FF00+C)
                 self.registers.setA(self.memory.get(u16(0xFF00) | self.registers.c()));
             },
             0xF5 => {
                 // PUSH AF
-                self.memory.set(self.registers.sp, self.registers.a());
-                self.memory.set(self.registers.sp - 1, self.registers.f());
-                self.registers.sp -= 2;
+                self.push(self.registers.af);
             },
             0xF8 => {
                 // LDHL SP,n
