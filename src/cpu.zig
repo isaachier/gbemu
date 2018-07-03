@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const Registers = struct {
     af: u16,
@@ -193,18 +194,26 @@ pub const Memory = struct {
         self.memory[internalIndex(index)] = value;
     }
 
+    pub fn slice(self: *const Memory, index: u16, len: usize) []const u8 {
+        const offset = internalIndex(index);
+        return self.memory[offset..offset + len];
+    }
 };
 
 pub const CPU = struct {
     pub const ErrorSet = error{ InvalidInstruction, };
+    pub const Stream = std.io.InStream(error{});
+    pub const EmptyErrorSet = error{};
 
     registers: Registers,
     memory: Memory,
+    stream: Stream,
 
     pub fn init(allocator: *std.mem.Allocator) !CPU {
         return CPU{
             .registers = undefined,
             .memory = try Memory.init(allocator),
+            .stream = Stream{ .readFn = CPU.readFn },
         };
     }
 
@@ -212,61 +221,58 @@ pub const CPU = struct {
         self.memory.deinit();
     }
 
+    fn readFn(in_stream: *Stream, buffer: []u8) EmptyErrorSet!usize {
+        const self = @fieldParentPtr(CPU, "stream", in_stream);
+        var len : usize = undefined;
+        if (usize(self.registers.pc) + buffer.len > 0xFFFF) {
+            len = 0xFFFF - self.registers.pc;
+        } else {
+            len = buffer.len;
+        }
+        std.mem.copy(u8, buffer, self.memory.slice(self.registers.pc, len));
+        self.registers.pc += @truncate(u16, len);
+        return len;
+    }
+
     pub fn execute(self: *CPU) !void {
-        switch (self.memory.get(self.registers.pc)) {
+        switch (try self.stream.readByte()) {
             0x01 => {
                 // LD BC,nn
-                const lsb : u8 = self.memory.get(self.registers.pc + 2);
-                const msb : u8 = self.memory.get(self.registers.pc + 1);
-                const value = u16(lsb) << 8 | msb;
-                self.registers.bc = value;
-                self.registers.pc += 3;
+                self.registers.bc = try self.stream.readIntLe(u16);
             },
             0x02 => {
                 // LD (BC),A
                 self.memory.set(self.registers.bc, self.registers.a());
-                self.registers.pc += 1;
             },
             0x06 => {
                 // LD B,n
-                self.registers.setB(self.memory.get(self.registers.pc + 1));
-                self.registers.pc += 2;
+                self.registers.setB(try self.stream.readByte());
             },
             0x08 => {
                 // LD (nn),SP
-                const lsb : u8 = self.memory.get(self.registers.pc + 2);
-                const msb : u8 = self.memory.get(self.registers.pc + 1);
-                const value = u16(lsb) << 8 | msb;
+                const value = try self.stream.readIntLe(u16);
                 self.memory.set(value, @truncate(u8, (self.registers.sp & 0xFF00) >> 8));
                 self.memory.set(value + 1, @truncate(u8, self.registers.sp));
             },
             0x0A => {
                 // LD A,(BC)
                 self.registers.setA(self.memory.get(self.registers.bc));
-                self.registers.pc += 1;
             },
             0x0E => {
                 // LD C,n
-                self.registers.setC(self.memory.get(self.registers.pc + 1));
-                self.registers.pc += 2;
+                self.registers.setC(try self.stream.readByte());
             },
             0x11 => {
                 // LD DE,nn
-                const lsb : u8 = self.memory.get(self.registers.pc + 2);
-                const msb : u8 = self.memory.get(self.registers.pc + 1);
-                const value = u16(lsb) << 8 | msb;
-                self.registers.de = value;
-                self.registers.pc += 3;
+                self.registers.de = try self.stream.readIntLe(u16);
             },
             0x12 => {
                 // LD (DE),A
                 self.memory.set(self.registers.de, self.registers.a());
-                self.registers.pc += 1;
             },
             0x16 => {
                 // LD D,n
-                self.registers.setD(self.memory.get(self.registers.pc + 1));
-                self.registers.pc += 2;
+                self.registers.setD(try self.stream.readByte());
             },
             0x1A => {
                 // LD A,(DE)
@@ -677,6 +683,10 @@ pub const CPU = struct {
                 // LD A,($FF00+C)
                 self.registers.setA(self.memory.get(u16(0xFF00) | self.registers.c()));
                 self.registers.pc += 1;
+            },
+            0xF5 => {
+                // PUSH nn
+                
             },
             0xF8 => {
                 // LDHL SP,n
