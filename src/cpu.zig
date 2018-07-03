@@ -72,20 +72,57 @@ pub const Registers = struct {
         return self.hl = (u16(self.h()) << 8) | value;
     }
 
+    const zero_flag_mask : u8 = 0x80;
+    const subtract_flag_mask : u8 = 0x40;
+    const half_carry_flag_mask : u8 = 0x20;
+    const carry_flag_mask : u8 = 0x10;
+
     pub fn zeroFlag(self: *const Registers) bool {
-        return (self.f() & 0x80) != 0;
+        return (self.f() & zero_flag_mask) != 0;
+    }
+
+    pub fn setZeroFlag(self: *Registers, value: bool) void {
+        if (value == true) {
+            self.setF(self.f() | zero_flag_mask);
+        } else {
+            self.setF(self.f() & (~zero_flag_mask));
+        }
     }
 
     pub fn subtractFlag(self: *const Registers) bool {
-        return (self.f() & 0x40) != 0;
+        return (self.f() & subtract_flag_mask) != 0;
+    }
+
+    pub fn setSubtractFlag(self: *Registers, value: bool) void {
+        if (value == true) {
+            self.setF(self.f() | subtract_flag_mask);
+        } else {
+            self.setF(self.f() & (~subtract_flag_mask));
+        }
     }
 
     pub fn halfCarryFlag(self: *const Registers) bool {
-        return (self.f() & 0x20) != 0;
+        return (self.f() & half_carry_flag_mask) != 0;
+    }
+
+    pub fn setHalfCarryFlag(self: *Registers, value: bool) void {
+        if (value == true) {
+            self.setF(self.f() | half_carry_flag_mask);
+        } else {
+            self.setF(self.f() & (~half_carry_flag_mask));
+        }
     }
 
     pub fn carryFlag(self: *const Registers) bool {
-        return (self.f() & 0x10) != 0;
+        return (self.f() & carry_flag_mask) != 0;
+    }
+
+    pub fn setCarryFlag(self: *Registers, value: bool) void {
+        if (value == true) {
+            self.setF(self.f() | carry_flag_mask);
+        } else {
+            self.setF(self.f() & (~carry_flag_mask));
+        }
     }
 };
 
@@ -177,6 +214,14 @@ pub const CPU = struct {
 
     pub fn execute(self: *CPU) !void {
         switch (self.memory.get(self.registers.pc)) {
+            0x01 => {
+                // LD BC,nn
+                const lsb : u8 = self.memory.get(self.registers.pc + 2);
+                const msb : u8 = self.memory.get(self.registers.pc + 1);
+                const value = u16(lsb) << 8 | msb;
+                self.registers.bc = value;
+                self.registers.pc += 3;
+            },
             0x02 => {
                 // LD (BC),A
                 self.memory.set(self.registers.bc, self.registers.a());
@@ -187,6 +232,14 @@ pub const CPU = struct {
                 self.registers.setB(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
             },
+            0x08 => {
+                // LD (nn),SP
+                const lsb : u8 = self.memory.get(self.registers.pc + 2);
+                const msb : u8 = self.memory.get(self.registers.pc + 1);
+                const value = u16(lsb) << 8 | msb;
+                self.memory.set(value, @truncate(u8, (self.registers.sp & 0xFF00) >> 8));
+                self.memory.set(value + 1, @truncate(u8, self.registers.sp));
+            },
             0x0A => {
                 // LD A,(BC)
                 self.registers.setA(self.memory.get(self.registers.bc));
@@ -196,6 +249,14 @@ pub const CPU = struct {
                 // LD C,n
                 self.registers.setC(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
+            },
+            0x11 => {
+                // LD DE,nn
+                const lsb : u8 = self.memory.get(self.registers.pc + 2);
+                const msb : u8 = self.memory.get(self.registers.pc + 1);
+                const value = u16(lsb) << 8 | msb;
+                self.registers.de = value;
+                self.registers.pc += 3;
             },
             0x12 => {
                 // LD (DE),A
@@ -216,6 +277,14 @@ pub const CPU = struct {
                 // LD E,n
                 self.registers.setE(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
+            },
+            0x21 => {
+                // LD HL,nn
+                const lsb : u8 = self.memory.get(self.registers.pc + 2);
+                const msb : u8 = self.memory.get(self.registers.pc + 1);
+                const value = u16(lsb) << 8 | msb;
+                self.registers.hl = value;
+                self.registers.pc += 3;
             },
             0x22 => {
                 // LDI (HL),A
@@ -238,6 +307,14 @@ pub const CPU = struct {
                 // LD L,n
                 self.registers.setL(self.memory.get(self.registers.pc + 1));
                 self.registers.pc += 2;
+            },
+            0x31 => {
+                // LD SP,nn
+                const lsb : u8 = self.memory.get(self.registers.pc + 2);
+                const msb : u8 = self.memory.get(self.registers.pc + 1);
+                const value = u16(lsb) << 8 | msb;
+                self.registers.sp = value;
+                self.registers.pc += 3;
             },
             0x32 => {
                 // LDD (HL),A
@@ -574,7 +651,7 @@ pub const CPU = struct {
             0xE0 => {
                 // LDH ($FF00+n),A
                 self.memory.set(u16(0xFF00) | self.memory.get(self.registers.pc + 1),
-                                    self.registers.a());
+                                self.registers.a());
                 self.registers.pc += 2;
             },
             0xE2 => {
@@ -599,6 +676,33 @@ pub const CPU = struct {
             0xF2 => {
                 // LD A,($FF00+C)
                 self.registers.setA(self.memory.get(u16(0xFF00) | self.registers.c()));
+                self.registers.pc += 1;
+            },
+            0xF8 => {
+                // LDHL SP,n
+                const n : u16 = self.memory.get(self.registers.pc + 1);
+                const new_h_value = self.registers.h() + @truncate(u8, (n & 0xFF00) >> 8);
+                const new_l_value = self.registers.l() + (n & 0xFF);
+                var half_carry_flag : bool = undefined;
+                var carry_flag : bool = undefined;
+                if (new_h_value > 0xFF) {
+                    self.registers.setCarryFlag(true);
+                } else {
+                    self.registers.setCarryFlag(false);
+                }
+                if (new_l_value > 0xFF) {
+                    self.registers.setHalfCarryFlag(true);
+                } else {
+                    self.registers.setHalfCarryFlag(false);
+                }
+                self.registers.setZeroFlag(false);
+                self.registers.setSubtractFlag(false);
+                self.registers.hl += n;
+                self.registers.pc += 2;
+            },
+            0xF9 => {
+                // LD SP,HL
+                self.registers.sp = self.registers.hl;
                 self.registers.pc += 1;
             },
             0xFA => {
