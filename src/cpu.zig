@@ -260,6 +260,42 @@ pub const CPU = struct {
         return result;
     }
 
+    fn sub(self: *CPU, a: u8, b: u8) u8 {
+        const result = a - b;
+        self.registers.setHalfCarryFlag((((a & 0xF) - (b & 0xF)) & 0x10) == 0x10);
+        self.registers.setCarryFlag(((((a >> 4) & 0xF) - ((b >> 4) & 0xF)) & 0x10) == 0x10);
+        self.registers.setZeroFlag(result == 0);
+        self.registers.setSubtractFlag(true);
+        return @bitCast(u8, result);
+    }
+
+    fn bitwiseAnd(self: *CPU, a: u8, b: u8) u8 {
+        const result = a & b;
+        self.registers.setHalfCarryFlag(true);
+        self.registers.setCarryFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        self.registers.setSubtractFlag(false);
+        return result;
+    }
+
+    fn bitwiseOr(self: *CPU, a: u8, b: u8) u8 {
+        const result = a | b;
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setCarryFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        self.registers.setSubtractFlag(false);
+        return result;
+    }
+
+    fn bitwiseXor(self: *CPU, a: u8, b: u8) u8 {
+        const result = a ^ b;
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setCarryFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        self.registers.setSubtractFlag(false);
+        return result;
+    }
+
     pub fn execute(self: *CPU) !void {
         switch (try self.stream.readByte()) {
             0x01 => {
@@ -600,9 +636,302 @@ pub const CPU = struct {
                 // LD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
             },
+            0x80 => {
+                // ADD A,B
+                self.registers.setA(self.add(self.registers.a(), self.registers.b()));
+            },
+            0x81 => {
+                // ADD A,C
+                self.registers.setA(self.add(self.registers.a(), self.registers.c()));
+            },
+            0x82 => {
+                // ADD A,D
+                self.registers.setA(self.add(self.registers.a(), self.registers.d()));
+            },
+            0x83 => {
+                // ADD A,E
+                self.registers.setA(self.add(self.registers.a(), self.registers.e()));
+            },
+            0x84 => {
+                // ADD A,H
+                self.registers.setA(self.add(self.registers.a(), self.registers.h()));
+            },
+            0x85 => {
+                // ADD A,L
+                self.registers.setA(self.add(self.registers.a(), self.registers.l()));
+            },
+            0x86 => {
+                // ADD A,(HL)
+                self.registers.setA(self.add(self.registers.a(),
+                                             self.memory.get(self.registers.hl)));
+            },
             0x87 => {
                 // ADD A,A
                 self.registers.setA(self.add(self.registers.a(), self.registers.a()));
+            },
+            0x88 => {
+                // ADC A,B
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    self.registers.b() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x89 => {
+                // ADC A,C
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    self.registers.c() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x8A => {
+                // ADC A,D
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    self.registers.d() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x8B => {
+                // ADC A,E
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    self.registers.e() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x8C => {
+                // ADC A,H
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    self.registers.h() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x8D => {
+                // ADC A,L
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    self.registers.l() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x8E => {
+                // ADC A,(HL)
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    self.memory.get(self.registers.hl) + @boolToInt(self.registers.carryFlag())));
+            },
+            0x8F => {
+                // ADC A,A
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    self.registers.a() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x90 => {
+                // SUB A,B
+                self.registers.setA(self.sub(self.registers.a(), self.registers.b()));
+            },
+            0x91 => {
+                // SUB A,C
+                self.registers.setA(self.sub(self.registers.a(), self.registers.c()));
+            },
+            0x92 => {
+                // SUB A,D
+                self.registers.setA(self.sub(self.registers.a(), self.registers.d()));
+            },
+            0x93 => {
+                // SUB A,E
+                self.registers.setA(self.sub(self.registers.a(), self.registers.e()));
+            },
+            0x94 => {
+                // SUB A,H
+                self.registers.setA(self.sub(self.registers.a(), self.registers.h()));
+            },
+            0x95 => {
+                // SUB A,L
+                self.registers.setA(self.sub(self.registers.a(), self.registers.l()));
+            },
+            0x96 => {
+                // SUB A,(HL)
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.memory.get(self.registers.hl)));
+            },
+            0x97 => {
+                // SUB A,A
+                self.registers.setA(self.sub(self.registers.a(), self.registers.a()));
+            },
+            0x98 => {
+                // SBC A,B
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.registers.b() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x99 => {
+                // SBC A,C
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.registers.c() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x9A => {
+                // SBC A,D
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.registers.d() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x9B => {
+                // SBC A,E
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.registers.e() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x9C => {
+                // SBC A,H
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.registers.h() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x9D => {
+                // SBC A,L
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.registers.l() + @boolToInt(self.registers.carryFlag())));
+            },
+            0x9E => {
+                // SBC A,(HL)
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.memory.get(self.registers.hl) + @boolToInt(self.registers.carryFlag())));
+            },
+            0x9F => {
+                // SBC A,A
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    self.registers.a() + @boolToInt(self.registers.carryFlag())));
+            },
+            0xA0 => {
+                // AND A,B
+                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.b()));
+            },
+            0xA1 => {
+                // AND A,C
+                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.b()));
+            },
+            0xA2 => {
+                // AND A,D
+                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.d()));
+            },
+            0xA3 => {
+                // AND A,E
+                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.e()));
+            },
+            0xA4 => {
+                // AND A,H
+                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.h()));
+            },
+            0xA5 => {
+                // AND A,L
+                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.l()));
+            },
+            0xA6 => {
+                // AND A,(HL)
+                self.registers.setA(self.bitwiseAnd(
+                    self.registers.a(),
+                    self.memory.get(self.registers.hl)));
+            },
+            0xA7 => {
+                // AND A,A
+                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.a()));
+            },
+            0xA8 => {
+                // XOR A,B
+                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.b()));
+            },
+            0xA9 => {
+                // XOR A,C
+                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.b()));
+            },
+            0xAA => {
+                // XOR A,D
+                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.d()));
+            },
+            0xAB => {
+                // XOR A,E
+                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.e()));
+            },
+            0xAC => {
+                // XOR A,H
+                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.h()));
+            },
+            0xAD => {
+                // XOR A,L
+                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.l()));
+            },
+            0xAE => {
+                // XOR A,(HL)
+                self.registers.setA(self.bitwiseXor(
+                    self.registers.a(),
+                    self.memory.get(self.registers.hl)));
+            },
+            0xAF => {
+                // XOR A,A
+                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.a()));
+            },
+            0xB0 => {
+                // OR A,B
+                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.b()));
+            },
+            0xB1 => {
+                // OR A,C
+                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.b()));
+            },
+            0xB2 => {
+                // OR A,D
+                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.d()));
+            },
+            0xB3 => {
+                // OR A,E
+                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.e()));
+            },
+            0xB4 => {
+                // OR A,H
+                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.h()));
+            },
+            0xB5 => {
+                // OR A,L
+                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.l()));
+            },
+            0xB6 => {
+                // OR A,(HL)
+                self.registers.setA(self.bitwiseOr(
+                    self.registers.a(),
+                    self.memory.get(self.registers.hl)));
+            },
+            0xB7 => {
+                // OR A,A
+                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.a()));
+            },
+            0xB8 => {
+                // CP A,B
+                _ = self.sub(self.registers.a(), self.registers.b());
+            },
+            0xB9 => {
+                // CP A,C
+                _ = self.sub(self.registers.a(), self.registers.c());
+            },
+            0xBA => {
+                // CP A,D
+                _ = self.sub(self.registers.a(), self.registers.d());
+            },
+            0xBB => {
+                // CP A,E
+                _ = self.sub(self.registers.a(), self.registers.e());
+            },
+            0xBC => {
+                // CP A,H
+                _ = self.sub(self.registers.a(), self.registers.h());
+            },
+            0xBD => {
+                // CP A,B
+                _ = self.sub(self.registers.a(), self.registers.l());
+            },
+            0xBE => {
+                // CP A,B
+                _ = self.sub(self.registers.a(), self.memory.get(self.registers.hl));
+            },
+            0xBF => {
+                // CP A,A
+                _ = self.sub(self.registers.a(), self.registers.a());
             },
             0xC1 => {
                 // POP BC
@@ -612,6 +941,20 @@ pub const CPU = struct {
                 // PUSH BC
                 self.push(self.registers.bc);
             },
+            0xC6 => {
+                // ADD A,n
+                self.registers.setA(self.add(self.registers.a(), try self.stream.readByte()));
+            },
+            0xD6 => {
+                // SUB A,n
+                self.registers.setA(self.sub(self.registers.a(), try self.stream.readByte()));
+            },
+            0xCE => {
+                // ADC A,n
+                self.registers.setA(self.add(
+                    self.registers.a(),
+                    (try self.stream.readByte()) + @boolToInt(self.registers.carryFlag())));
+            },
             0xD1 => {
                 // POP DE
                 self.registers.de = self.pop(u16);
@@ -619,6 +962,12 @@ pub const CPU = struct {
             0xD5 => {
                 // PUSH DE
                 self.push(self.registers.de);
+            },
+            0xDE => {
+                // SBC A,n
+                self.registers.setA(self.sub(
+                    self.registers.a(),
+                    (try self.stream.readByte()) + @boolToInt(self.registers.carryFlag())));
             },
             0xE0 => {
                 // LDH ($FF00+n),A
@@ -637,9 +986,21 @@ pub const CPU = struct {
                 // PUSH HL
                 self.push(self.registers.hl);
             },
+            0xE6 => {
+                // AND A,n
+                self.registers.setA(self.bitwiseAnd(
+                    self.registers.a(),
+                    try self.stream.readByte()));
+            },
             0xEA => {
                 // LD (nn),A
                 self.memory.set(try self.stream.readIntLe(u16), self.registers.a());
+            },
+            0xEE => {
+                // XOR A,n
+                self.registers.setA(self.bitwiseXor(
+                    self.registers.a(),
+                    try self.stream.readByte()));
             },
             0xF0 => {
                 // LDH A,($FF00+n)
@@ -657,6 +1018,12 @@ pub const CPU = struct {
                 // PUSH AF
                 self.push(self.registers.af);
             },
+            0xF6 => {
+                // OR A,n
+                self.registers.setA(self.bitwiseOr(
+                    self.registers.a(),
+                    try self.stream.readByte()));
+            },
             0xF8 => {
                 // LDHL SP,n
                 const n = try self.stream.readByte();
@@ -670,6 +1037,10 @@ pub const CPU = struct {
                 // LD A,(HL)
                 const address = try self.stream.readIntLe(u16);
                 self.registers.setA(self.memory.get(address));
+            },
+            0xFE => {
+                // CP A,n
+                _ = self.sub(self.registers.a(), try self.stream.readByte());
             },
             else => {
                 return ErrorSet.InvalidInstruction;
