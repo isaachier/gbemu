@@ -805,7 +805,7 @@ pub const CPU = struct {
             },
             0xA1 => {
                 // AND A,C
-                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.b()));
+                self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.c()));
             },
             0xA2 => {
                 // AND A,D
@@ -839,7 +839,7 @@ pub const CPU = struct {
             },
             0xA9 => {
                 // XOR A,C
-                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.b()));
+                self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.c()));
             },
             0xAA => {
                 // XOR A,D
@@ -873,7 +873,7 @@ pub const CPU = struct {
             },
             0xB1 => {
                 // OR A,C
-                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.b()));
+                self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.c()));
             },
             0xB2 => {
                 // OR A,D
