@@ -306,6 +306,14 @@ pub const CPU = struct {
                 // LD (BC),A
                 self.memory.set(self.registers.bc, self.registers.a());
             },
+            0x04 => {
+                // INC B
+                self.registers.setB(self.add(self.registers.b(), 1));
+            },
+            0x05 => {
+                // DEC B
+                self.registers.setB(self.sub(self.registers.b(), 1));
+            },
             0x06 => {
                 // LD B,n
                 self.registers.setB(try self.stream.readByte());
@@ -320,6 +328,14 @@ pub const CPU = struct {
                 // LD A,(BC)
                 self.registers.setA(self.memory.get(self.registers.bc));
             },
+            0x0C => {
+                // INC C
+                self.registers.setC(self.add(self.registers.c(), 1));
+            },
+            0x0D => {
+                // DEC D
+                self.registers.setD(self.sub(self.registers.d(), 1));
+            },
             0x0E => {
                 // LD C,n
                 self.registers.setC(try self.stream.readByte());
@@ -332,6 +348,14 @@ pub const CPU = struct {
                 // LD (DE),A
                 self.memory.set(self.registers.de, self.registers.a());
             },
+            0x14 => {
+                // INC D
+                self.registers.setD(self.add(self.registers.d(), 1));
+            },
+            0x15 => {
+                // DEC D
+                self.registers.setD(self.sub(self.registers.d(), 1));
+            },
             0x16 => {
                 // LD D,n
                 self.registers.setD(try self.stream.readByte());
@@ -339,6 +363,14 @@ pub const CPU = struct {
             0x1A => {
                 // LD A,(DE)
                 self.registers.setA(self.memory.get(self.registers.de));
+            },
+            0x1C => {
+                // INC E
+                self.registers.setE(self.add(self.registers.e(), 1));
+            },
+            0x1D => {
+                // DEC E
+                self.registers.setE(self.sub(self.registers.e(), 1));
             },
             0x1E => {
                 // LD E,n
@@ -353,6 +385,14 @@ pub const CPU = struct {
                 self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.hl +%= 1;
             },
+            0x24 => {
+                // INC H
+                self.registers.setH(self.add(self.registers.h(), 1));
+            },
+            0x25 => {
+                // DEC H
+                self.registers.setH(self.sub(self.registers.h(), 1));
+            },
             0x26 => {
                 // LD H,n
                 self.registers.setH(try self.stream.readByte());
@@ -361,6 +401,14 @@ pub const CPU = struct {
                 // LDI A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
                 self.registers.hl +%= 1;
+            },
+            0x2C => {
+                // INC L
+                self.registers.setL(self.add(self.registers.l(), 1));
+            },
+            0x2D => {
+                // DEC L
+                self.registers.setL(self.sub(self.registers.l(), 1));
             },
             0x2E => {
                 // LD L,n
@@ -375,6 +423,16 @@ pub const CPU = struct {
                 self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.hl -%= 1;
             },
+            0x34 => {
+                // INC (HL)
+                self.memory.set(self.registers.hl,
+                                self.add(self.memory.get(self.registers.hl), 1));
+            },
+            0x35 => {
+                // DEC (HL)
+                self.memory.set(self.registers.hl,
+                                self.sub(self.memory.get(self.registers.hl), 1));
+            },
             0x36 => {
                 // LD (HL),n
                 self.memory.set(self.registers.hl, try self.stream.readByte());
@@ -383,6 +441,14 @@ pub const CPU = struct {
                 // LDD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
                 self.registers.hl -%= 1;
+            },
+            0x3C => {
+                // INC A
+                self.registers.setA(self.add(self.registers.a(), 1));
+            },
+            0x3D => {
+                // DEC A
+                self.registers.setA(self.sub(self.registers.a(), 1));
             },
             0x3E => {
                 // LD A,n
