@@ -251,6 +251,15 @@ pub const CPU = struct {
         return value;
     }
 
+    fn add(self: *CPU, a: u8, b: u8) u8 {
+        const result = a + b;
+        self.registers.setHalfCarryFlag((((a & 0xF) + (b & 0xF)) & 0x10) == 0x10);
+        self.registers.setCarryFlag(((((a >> 4) & 0xF) + ((b >> 4) & 0xF)) & 0x10) == 0x10);
+        self.registers.setZeroFlag(result == 0);
+        self.registers.setSubtractFlag(false);
+        return result;
+    }
+
     pub fn execute(self: *CPU) !void {
         switch (try self.stream.readByte()) {
             0x01 => {
@@ -591,6 +600,10 @@ pub const CPU = struct {
                 // LD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
             },
+            0x87 => {
+                // ADD A,A
+                self.registers.setA(self.add(self.registers.a(), self.registers.a()));
+            },
             0xC1 => {
                 // POP BC
                 self.registers.bc = self.pop(u16);
@@ -646,18 +659,8 @@ pub const CPU = struct {
             },
             0xF8 => {
                 // LDHL SP,n
-                const n : u8 = try self.stream.readByte();
-                const lsb = @truncate(u8, self.registers.sp);
-                var result_u8 : u8 = undefined;
-                const half_carry_flag = @addWithOverflow(u8, lsb, n, &result_u8);
-                var result_u16 : u16 = undefined;
-                const carry_flag = @addWithOverflow(u16, self.registers.sp, n, &result_u16);
-                self.registers.setHalfCarryFlag(half_carry_flag);
-                self.registers.setCarryFlag(carry_flag);
-                self.registers.setZeroFlag(false);
-                self.registers.setSubtractFlag(false);
-                self.registers.sp +%= n;
-                self.registers.hl = self.registers.sp;
+                const n = try self.stream.readByte();
+                self.registers.hl = self.add(@truncate(u8, self.registers.sp), n);
             },
             0xF9 => {
                 // LD SP,HL
