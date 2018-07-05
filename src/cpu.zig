@@ -209,6 +209,12 @@ pub const CPU = struct {
     pub const ErrorSet = error{ InvalidInstruction, };
     pub const Stream = std.io.InStream(error{});
     pub const EmptyErrorSet = error{};
+    pub const Mode = enum {
+        Default,
+        Halt,
+        DisableInterrupts,
+        EnableInterrupts,
+    };
 
     registers: Registers,
     memory: Memory,
@@ -304,8 +310,22 @@ pub const CPU = struct {
         return result;
     }
 
-    pub fn execute(self: *CPU) !void {
+    fn swap(self: *CPU, x: u8) u8 {
+        const high_nibble = x & 0xF0;
+        const low_nibble = x & 0x0F;
+        const result = low_nibble << 4 | (high_nibble >> 4);
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setCarryFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        self.registers.setSubtractFlag(false);
+        return result;
+    }
+
+    pub fn execute(self: *CPU) !Mode {
         switch (try self.stream.readByte()) {
+            0x00 => {
+                // NOP
+            },
             0x01 => {
                 // LD BC,nn
                 self.registers.bc = try self.stream.readIntLe(u16);
@@ -313,6 +333,10 @@ pub const CPU = struct {
             0x02 => {
                 // LD (BC),A
                 self.memory.set(self.registers.bc, self.registers.a());
+            },
+            0x03 => {
+                // INC BC
+                self.registers.bc = self.add(u16, self.registers.bc, 1);
             },
             0x04 => {
                 // INC B
@@ -340,6 +364,10 @@ pub const CPU = struct {
                 // LD A,(BC)
                 self.registers.setA(self.memory.get(self.registers.bc));
             },
+            0x0B => {
+                // DEC BC
+                self.registers.bc -%= 1;
+            },
             0x0C => {
                 // INC C
                 self.registers.setC(self.add(u8, self.registers.c(), 1));
@@ -360,6 +388,10 @@ pub const CPU = struct {
                 // LD (DE),A
                 self.memory.set(self.registers.de, self.registers.a());
             },
+            0x13 => {
+                // INC DE
+                self.registers.de = self.add(u16, self.registers.de, 1);
+            },
             0x14 => {
                 // INC D
                 self.registers.setD(self.add(u8, self.registers.d(), 1));
@@ -372,9 +404,17 @@ pub const CPU = struct {
                 // LD D,n
                 self.registers.setD(try self.stream.readByte());
             },
+            0x19 => {
+                // ADD HL,DE
+                self.registers.hl = self.add(u16, self.registers.hl, self.registers.de);
+            },
             0x1A => {
                 // LD A,(DE)
                 self.registers.setA(self.memory.get(self.registers.de));
+            },
+            0x1B => {
+                // DEC DE
+                self.registers.de -%= 1;
             },
             0x1C => {
                 // INC E
@@ -397,6 +437,10 @@ pub const CPU = struct {
                 self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.hl +%= 1;
             },
+            0x23 => {
+                // INC HL
+                self.registers.hl = self.add(u16, self.registers.hl, 1);
+            },
             0x24 => {
                 // INC H
                 self.registers.setH(self.add(u8, self.registers.h(), 1));
@@ -409,10 +453,41 @@ pub const CPU = struct {
                 // LD H,n
                 self.registers.setH(try self.stream.readByte());
             },
+            0x27 => {
+                // DAA
+                var carry = false;
+                if (!self.registers.subtractFlag()) {
+                    if (self.registers.carryFlag() or self.registers.a() > 0x99) {
+                        self.registers.setA(self.registers.a() +% 0x60);
+                        carry = true;
+                    }
+                    if (self.registers.halfCarryFlag() or (self.registers.a() & 0x0F) > 0x09) {
+                        self.registers.setA(self.registers.a() +% 0x06);
+                    }
+                } else if (self.registers.carryFlag()) {
+                    carry = true;
+                    const adjustment = if (self.registers.halfCarryFlag()) u8(0x9A) else u8(0xA0);
+                    self.registers.setA(self.registers.a() +% adjustment);
+                } else if (self.registers.halfCarryFlag()) {
+                    self.registers.setA(self.registers.a() +% 0xFA);
+                }
+
+                self.registers.setZeroFlag(self.registers.a() == 0);
+                self.registers.setCarryFlag(carry);
+                self.registers.setHalfCarryFlag(false);
+            },
+            0x29 => {
+                // ADD HL,HL
+                self.registers.hl = self.add(u16, self.registers.hl, self.registers.hl);
+            },
             0x2A => {
                 // LDI A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
                 self.registers.hl +%= 1;
+            },
+            0x2B => {
+                // DEC HL
+                self.registers.hl -%= 1;
             },
             0x2C => {
                 // INC L
@@ -426,6 +501,12 @@ pub const CPU = struct {
                 // LD L,n
                 self.registers.setL(try self.stream.readByte());
             },
+            0x2F => {
+                // CPL
+                self.registers.setA(~self.registers.a());
+                self.registers.setSubtractFlag(true);
+                self.registers.setHalfCarryFlag(true);
+            },
             0x31 => {
                 // LD SP,nn
                 self.registers.sp = try self.stream.readIntLe(u16);
@@ -434,6 +515,10 @@ pub const CPU = struct {
                 // LDD (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.hl -%= 1;
+            },
+            0x33 => {
+                // INC SP
+                self.registers.sp = self.add(u16, self.registers.sp, 1);
             },
             0x34 => {
                 // INC (HL)
@@ -449,9 +534,23 @@ pub const CPU = struct {
                 // LD (HL),n
                 self.memory.set(self.registers.hl, try self.stream.readByte());
             },
+            0x37 => {
+                // SCF
+                self.registers.setSubtractFlag(false);
+                self.registers.setHalfCarryFlag(false);
+                self.registers.setCarryFlag(true);
+            },
+            0x39 => {
+                // ADD HL,SP
+                self.registers.hl = self.add(u16, self.registers.hl, self.registers.sp);
+            },
             0x3A => {
                 // LDD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
+                self.registers.hl -%= 1;
+            },
+            0x3B => {
+                // DEC HL
                 self.registers.hl -%= 1;
             },
             0x3C => {
@@ -465,6 +564,12 @@ pub const CPU = struct {
             0x3E => {
                 // LD A,n
                 self.registers.setA(try self.stream.readByte());
+            },
+            0x3F => {
+                // CCF
+                self.registers.setSubtractFlag(false);
+                self.registers.setHalfCarryFlag(false);
+                self.registers.setCarryFlag(!self.registers.carryFlag());
             },
             0x40 => {
                 // LD B,B
@@ -681,6 +786,10 @@ pub const CPU = struct {
             0x75 => {
                 // LD (HL),L
                 self.memory.set(self.registers.hl, self.registers.l());
+            },
+            0x76 => {
+                // HALT
+                return Mode.Halt;
             },
             0x77 => {
                 // LD (HL),A
@@ -1027,6 +1136,47 @@ pub const CPU = struct {
                 // SUB A,n
                 self.registers.setA(self.sub(self.registers.a(), try self.stream.readByte()));
             },
+            0xCB => {
+                switch (try self.stream.readByte()) {
+                    0x30 => {
+                        // SWAP B
+                        self.registers.setB(self.swap(self.registers.b()));
+                    },
+                    0x31 => {
+                        // SWAP C
+                        self.registers.setC(self.swap(self.registers.c()));
+                    },
+                    0x32 => {
+                        // SWAP D
+                        self.registers.setD(self.swap(self.registers.d()));
+                    },
+                    0x33 => {
+                        // SWAP E
+                        self.registers.setE(self.swap(self.registers.e()));
+                    },
+                    0x34 => {
+                        // SWAP H
+                        self.registers.setH(self.swap(self.registers.h()));
+                    },
+                    0x35 => {
+                        // SWAP L
+                        self.registers.setL(self.swap(self.registers.l()));
+                    },
+                    0x36 => {
+                        // SWAP (HL)
+                        self.memory.set(
+                            self.registers.hl,
+                            self.swap(self.memory.get(self.registers.hl)));
+                    },
+                    0x37 => {
+                        // SWAP A
+                        self.registers.setA(self.swap(self.registers.a()));
+                    },
+                    else => {
+                        return ErrorSet.InvalidInstruction;
+                    },
+                }
+            },
             0xCE => {
                 // ADC A,n
                 self.registers.setA(self.add(u8,
@@ -1070,6 +1220,12 @@ pub const CPU = struct {
                     self.registers.a(),
                     try self.stream.readByte()));
             },
+            0xE8 => {
+                // ADD SP,n
+                self.registers.sp = self.add(u16,
+                    self.registers.sp,
+                    try self.stream.readByte());
+            },
             0xEA => {
                 // LD (nn),A
                 self.memory.set(try self.stream.readIntLe(u16), self.registers.a());
@@ -1091,6 +1247,10 @@ pub const CPU = struct {
             0xF2 => {
                 // LD A,($FF00+C)
                 self.registers.setA(self.memory.get(u16(0xFF00) | self.registers.c()));
+            },
+            0xF3 => {
+                // DI
+                return Mode.DisableInterrupts;
             },
             0xF5 => {
                 // PUSH AF
@@ -1116,6 +1276,9 @@ pub const CPU = struct {
                 const address = try self.stream.readIntLe(u16);
                 self.registers.setA(self.memory.get(address));
             },
+            0xFB => {
+                return Mode.EnableInterrupts;
+            },
             0xFE => {
                 // CP A,n
                 _ = self.sub(self.registers.a(), try self.stream.readByte());
@@ -1124,6 +1287,7 @@ pub const CPU = struct {
                 return ErrorSet.InvalidInstruction;
             },
         }
+        return Mode.Default;
     }
 };
 
@@ -1133,7 +1297,7 @@ test "CPU" {
     cpu.registers.hl = 0x55;
     cpu.memory.set(0x0, 0x7E);
     cpu.memory.set(0x55, 0x20);
-    try cpu.execute();
+    _ = try cpu.execute();
     std.debug.assert(cpu.registers.a() == 0x20);
     std.debug.assert(cpu.registers.pc == 1);
     std.debug.assert(cpu.add(u8, 0x4, 0x6) == 0xA);
