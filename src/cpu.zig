@@ -251,10 +251,18 @@ pub const CPU = struct {
         return value;
     }
 
-    fn add(self: *CPU, a: u8, b: u8) u8 {
+    fn add(self: *CPU, comptime T: type, a: T, b: T) T {
+        const B = @IntType(false, @sizeOf(T) * 16);
+        const high_test_bit_num_trailing_zeros = @sizeOf(T) * 8;
+        const high_test_bit : B = 1 << high_test_bit_num_trailing_zeros;
+        const high_operand_mask = high_test_bit - 1;
+        const low_test_bit = high_test_bit >> 4;
+        const low_operand_mask = (low_test_bit) - 1;
         const result = a + b;
-        self.registers.setHalfCarryFlag((((a & 0xF) + (b & 0xF)) & 0x10) == 0x10);
-        self.registers.setCarryFlag(((((a >> 4) & 0xF) + ((b >> 4) & 0xF)) & 0x10) == 0x10);
+        self.registers.setHalfCarryFlag(
+            (((a & low_operand_mask) + (b & low_operand_mask)) & low_test_bit) == low_test_bit);
+        self.registers.setCarryFlag(
+            (((a & high_operand_mask) + (b & high_operand_mask)) & high_test_bit) == high_test_bit);
         self.registers.setZeroFlag(result == 0);
         self.registers.setSubtractFlag(false);
         return result;
@@ -308,7 +316,7 @@ pub const CPU = struct {
             },
             0x04 => {
                 // INC B
-                self.registers.setB(self.add(self.registers.b(), 1));
+                self.registers.setB(self.add(u8, self.registers.b(), 1));
             },
             0x05 => {
                 // DEC B
@@ -324,13 +332,17 @@ pub const CPU = struct {
                 self.memory.set(value, @truncate(u8, (self.registers.sp & 0xFF00) >> 8));
                 self.memory.set(value + 1, @truncate(u8, self.registers.sp));
             },
+            0x09 => {
+                // ADD HL,BC
+                self.registers.hl = self.add(u16, self.registers.hl, self.registers.bc);
+            },
             0x0A => {
                 // LD A,(BC)
                 self.registers.setA(self.memory.get(self.registers.bc));
             },
             0x0C => {
                 // INC C
-                self.registers.setC(self.add(self.registers.c(), 1));
+                self.registers.setC(self.add(u8, self.registers.c(), 1));
             },
             0x0D => {
                 // DEC D
@@ -350,7 +362,7 @@ pub const CPU = struct {
             },
             0x14 => {
                 // INC D
-                self.registers.setD(self.add(self.registers.d(), 1));
+                self.registers.setD(self.add(u8, self.registers.d(), 1));
             },
             0x15 => {
                 // DEC D
@@ -366,7 +378,7 @@ pub const CPU = struct {
             },
             0x1C => {
                 // INC E
-                self.registers.setE(self.add(self.registers.e(), 1));
+                self.registers.setE(self.add(u8, self.registers.e(), 1));
             },
             0x1D => {
                 // DEC E
@@ -387,7 +399,7 @@ pub const CPU = struct {
             },
             0x24 => {
                 // INC H
-                self.registers.setH(self.add(self.registers.h(), 1));
+                self.registers.setH(self.add(u8, self.registers.h(), 1));
             },
             0x25 => {
                 // DEC H
@@ -404,7 +416,7 @@ pub const CPU = struct {
             },
             0x2C => {
                 // INC L
-                self.registers.setL(self.add(self.registers.l(), 1));
+                self.registers.setL(self.add(u8, self.registers.l(), 1));
             },
             0x2D => {
                 // DEC L
@@ -426,7 +438,7 @@ pub const CPU = struct {
             0x34 => {
                 // INC (HL)
                 self.memory.set(self.registers.hl,
-                                self.add(self.memory.get(self.registers.hl), 1));
+                                self.add(u8, self.memory.get(self.registers.hl), 1));
             },
             0x35 => {
                 // DEC (HL)
@@ -444,7 +456,7 @@ pub const CPU = struct {
             },
             0x3C => {
                 // INC A
-                self.registers.setA(self.add(self.registers.a(), 1));
+                self.registers.setA(self.add(u8, self.registers.a(), 1));
             },
             0x3D => {
                 // DEC A
@@ -704,82 +716,82 @@ pub const CPU = struct {
             },
             0x80 => {
                 // ADD A,B
-                self.registers.setA(self.add(self.registers.a(), self.registers.b()));
+                self.registers.setA(self.add(u8, self.registers.a(), self.registers.b()));
             },
             0x81 => {
                 // ADD A,C
-                self.registers.setA(self.add(self.registers.a(), self.registers.c()));
+                self.registers.setA(self.add(u8, self.registers.a(), self.registers.c()));
             },
             0x82 => {
                 // ADD A,D
-                self.registers.setA(self.add(self.registers.a(), self.registers.d()));
+                self.registers.setA(self.add(u8, self.registers.a(), self.registers.d()));
             },
             0x83 => {
                 // ADD A,E
-                self.registers.setA(self.add(self.registers.a(), self.registers.e()));
+                self.registers.setA(self.add(u8, self.registers.a(), self.registers.e()));
             },
             0x84 => {
                 // ADD A,H
-                self.registers.setA(self.add(self.registers.a(), self.registers.h()));
+                self.registers.setA(self.add(u8, self.registers.a(), self.registers.h()));
             },
             0x85 => {
                 // ADD A,L
-                self.registers.setA(self.add(self.registers.a(), self.registers.l()));
+                self.registers.setA(self.add(u8, self.registers.a(), self.registers.l()));
             },
             0x86 => {
                 // ADD A,(HL)
-                self.registers.setA(self.add(self.registers.a(),
+                self.registers.setA(self.add(u8, self.registers.a(),
                                              self.memory.get(self.registers.hl)));
             },
             0x87 => {
                 // ADD A,A
-                self.registers.setA(self.add(self.registers.a(), self.registers.a()));
+                self.registers.setA(self.add(u8, self.registers.a(), self.registers.a()));
             },
             0x88 => {
                 // ADC A,B
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.b() + @boolToInt(self.registers.carryFlag())));
             },
             0x89 => {
                 // ADC A,C
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.c() + @boolToInt(self.registers.carryFlag())));
             },
             0x8A => {
                 // ADC A,D
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.d() + @boolToInt(self.registers.carryFlag())));
             },
             0x8B => {
                 // ADC A,E
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.e() + @boolToInt(self.registers.carryFlag())));
             },
             0x8C => {
                 // ADC A,H
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.h() + @boolToInt(self.registers.carryFlag())));
             },
             0x8D => {
                 // ADC A,L
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.l() + @boolToInt(self.registers.carryFlag())));
             },
             0x8E => {
                 // ADC A,(HL)
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.memory.get(self.registers.hl) + @boolToInt(self.registers.carryFlag())));
             },
             0x8F => {
                 // ADC A,A
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.a() + @boolToInt(self.registers.carryFlag())));
             },
@@ -1009,7 +1021,7 @@ pub const CPU = struct {
             },
             0xC6 => {
                 // ADD A,n
-                self.registers.setA(self.add(self.registers.a(), try self.stream.readByte()));
+                self.registers.setA(self.add(u8, self.registers.a(), try self.stream.readByte()));
             },
             0xD6 => {
                 // SUB A,n
@@ -1017,7 +1029,7 @@ pub const CPU = struct {
             },
             0xCE => {
                 // ADC A,n
-                self.registers.setA(self.add(
+                self.registers.setA(self.add(u8,
                     self.registers.a(),
                     (try self.stream.readByte()) + @boolToInt(self.registers.carryFlag())));
             },
@@ -1093,7 +1105,7 @@ pub const CPU = struct {
             0xF8 => {
                 // LDHL SP,n
                 const n = try self.stream.readByte();
-                self.registers.hl = self.add(@truncate(u8, self.registers.sp), n);
+                self.registers.hl = self.add(u8, @truncate(u8, self.registers.sp), n);
             },
             0xF9 => {
                 // LD SP,HL
@@ -1124,5 +1136,7 @@ test "CPU" {
     try cpu.execute();
     std.debug.assert(cpu.registers.a() == 0x20);
     std.debug.assert(cpu.registers.pc == 1);
+    std.debug.assert(cpu.add(u8, 0xA, 0x6) == 0x10);
+    std.debug.assert(cpu.registers.halfCarryFlag());
     cpu.deinit();
 }
