@@ -1136,6 +1136,8 @@ test "CPU" {
     try cpu.execute();
     std.debug.assert(cpu.registers.a() == 0x20);
     std.debug.assert(cpu.registers.pc == 1);
+    std.debug.assert(cpu.add(u8, 0x4, 0x6) == 0xA);
+    std.debug.assert(!cpu.registers.halfCarryFlag());
     std.debug.assert(cpu.add(u8, 0xA, 0x6) == 0x10);
     std.debug.assert(cpu.registers.halfCarryFlag());
     cpu.deinit();
