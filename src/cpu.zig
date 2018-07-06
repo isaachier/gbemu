@@ -212,6 +212,7 @@ pub const CPU = struct {
     pub const Mode = enum {
         Default,
         Halt,
+        Stop,
         DisableInterrupts,
         EnableInterrupts,
     };
@@ -321,6 +322,18 @@ pub const CPU = struct {
         return result;
     }
 
+    // Based on https://doc.rust-lang.org/std/primitive.u64.html#method.rotate_left.
+    fn rotateLeft(self: *CPU, comptime T: type, x: T, shift_amt: usize) T {
+        const Log2T = @IntType(false, std.math.log2(T.bit_count));
+        const n = @truncate(Log2T, shift_amt % T.bit_count);
+        const result = (x << n) | (x >> @truncate(Log2T, (T.bit_count - usize(n)) % T.bit_count));
+        self.registers.setCarryFlag((x & 0x10) != 0);
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setSubtractFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        return result;
+    }
+
     pub fn execute(self: *CPU) !Mode {
         switch (try self.stream.readByte()) {
             0x00 => {
@@ -349,6 +362,10 @@ pub const CPU = struct {
             0x06 => {
                 // LD B,n
                 self.registers.setB(try self.stream.readByte());
+            },
+            0x07 => {
+                // RLCA
+                self.registers.setA(self.rotateLeft(u8, self.registers.a(), 1));
             },
             0x08 => {
                 // LD (nn),SP
@@ -379,6 +396,17 @@ pub const CPU = struct {
             0x0E => {
                 // LD C,n
                 self.registers.setC(try self.stream.readByte());
+            },
+            0x10 => {
+                // STOP
+                switch (try self.stream.readByte()) {
+                    0x00 => {
+                        return Mode.Stop;
+                    },
+                    else => {
+                        return ErrorSet.InvalidInstruction;
+                    }
+                }
             },
             0x11 => {
                 // LD DE,nn
