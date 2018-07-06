@@ -389,6 +389,14 @@ pub const CPU = struct {
         return result;
     }
 
+    fn testBit(self: *CPU, x: u8, pos: u8) void {
+        const n = @truncate(u3, pos);
+        const result = (x & (u8(1) << n)) != 0;
+        self.registers.setZeroFlag(!result);
+        self.registers.setSubtractFlag(false);
+        self.registers.setHalfCarryFlag(true);
+    }
+
     pub fn execute(self: *CPU) !Mode {
         switch (try self.stream.readByte()) {
             0x00 => {
@@ -1489,6 +1497,108 @@ pub const CPU = struct {
                         // SRL (HL)
                         self.memory.set(self.registers.hl,
                                         self.srl(self.memory.get(self.registers.hl)));
+                    },
+                    0x3F => {
+                        // SRL A
+                        self.registers.setA(self.srl(self.registers.a()));
+                    },
+                    0x40 => {
+                        // BIT n,B
+                        self.testBit(self.registers.b(), try self.stream.readByte());
+                    },
+                    0x41 => {
+                        // BIT n,C
+                        self.testBit(self.registers.c(), try self.stream.readByte());
+                    },
+                    0x42 => {
+                        // BIT n,D
+                        self.testBit(self.registers.d(), try self.stream.readByte());
+                    },
+                    0x43 => {
+                        // BIT n,E
+                        self.testBit(self.registers.e(), try self.stream.readByte());
+                    },
+                    0x44 => {
+                        // BIT n,H
+                        self.testBit(self.registers.h(), try self.stream.readByte());
+                    },
+                    0x45 => {
+                        // BIT n,L
+                        self.testBit(self.registers.l(), try self.stream.readByte());
+                    },
+                    0x46 => {
+                        // BIT n,(HL)
+                        self.testBit(self.memory.get(self.registers.hl), try self.stream.readByte());
+                    },
+                    0x47 => {
+                        // BIT n,A
+                        self.testBit(self.registers.a(), try self.stream.readByte());
+                    },
+                    0x80 => {
+                        // RES n,B
+                        self.registers.setB(self.registers.b() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0x81 => {
+                        // RES n,C
+                        self.registers.setC(self.registers.c() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0x82 => {
+                        // RES n,D
+                        self.registers.setD(self.registers.d() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0x83 => {
+                        // RES n,E
+                        self.registers.setE(self.registers.e() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0x84 => {
+                        // RES n,H
+                        self.registers.setH(self.registers.h() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0x85 => {
+                        // RES n,L
+                        self.registers.setL(self.registers.l() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0x86 => {
+                        // RES n,(HL)
+                        self.memory.set(self.registers.hl,
+                                        self.memory.get(self.registers.hl) & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0x87 => {
+                        // RES n,A
+                        self.registers.setA(self.registers.a() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0xC0 => {
+                        // SET n,B
+                        self.registers.setB(self.registers.b() | (u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0xC1 => {
+                        // SET n,C
+                        self.registers.setC(self.registers.c() | (u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0xC2 => {
+                        // SET n,D
+                        self.registers.setD(self.registers.d() | (u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0xC3 => {
+                        // SET n,E
+                        self.registers.setE(self.registers.e() | (u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0xC4 => {
+                        // SET n,H
+                        self.registers.setH(self.registers.h() | (u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0xC5 => {
+                        // SET n,L
+                        self.registers.setL(self.registers.l() | (u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0xC6 => {
+                        // SET n,(HL)
+                        self.memory.set(self.registers.hl,
+                                        self.memory.get(self.registers.hl) | (u8(1) << @truncate(u3, try self.stream.readByte())));
+                    },
+                    0xC7 => {
+                        // SET n,A
+                        self.registers.setA(self.registers.a() | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
                     else => {
                         return ErrorSet.InvalidInstruction;
