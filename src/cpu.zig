@@ -322,15 +322,70 @@ pub const CPU = struct {
         return result;
     }
 
-    // Based on https://doc.rust-lang.org/std/primitive.u64.html#method.rotate_left.
-    fn rotateLeft(self: *CPU, comptime T: type, x: T, shift_amt: usize) T {
-        const Log2T = @IntType(false, std.math.log2(T.bit_count));
-        const n = @truncate(Log2T, shift_amt % T.bit_count);
-        const result = (x << n) | (x >> @truncate(Log2T, (T.bit_count - usize(n)) % T.bit_count));
-        self.registers.setCarryFlag((x & 0x10) != 0);
+    fn rlc(self: *CPU, x: u8) u8 {
+        const result = (x << 1) | (x >> 7);
+        self.registers.setCarryFlag((x & 0x80) != 0);
         self.registers.setHalfCarryFlag(false);
         self.registers.setSubtractFlag(false);
         self.registers.setZeroFlag(result == 0);
+        return result;
+    }
+
+    fn rl(self: *CPU, x: u8) u8 {
+        const carry_flag = @boolToInt(self.registers.carryFlag());
+        const result = x << 1 | carry_flag;
+        self.registers.setCarryFlag((x & 0x80) != 0);
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setSubtractFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        return result;
+    }
+
+    fn rrc(self: *CPU, x: u8) u8 {
+        const result = (x << 7) | (x >> 1);
+        self.registers.setCarryFlag((x & 0x01) != 0);
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setSubtractFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        return result;
+    }
+
+    fn rr(self: *CPU, x: u8) u8 {
+        const result = (u8(@boolToInt(self.registers.carryFlag())) << 7) | (x >> 1);
+        self.registers.setCarryFlag((x & 0x01) != 0);
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setSubtractFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        return result;
+    }
+
+    fn sla(self: *CPU, x: u8) u8 {
+        const result = x << 1;
+        self.registers.setCarryFlag((x & 0x80) != 0);
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setSubtractFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        std.debug.assert((result & 0x01) == 0);
+        return result;
+    }
+
+    fn sra(self: *CPU, x: u8) u8 {
+        const result = (x & 0x80) | x >> 1;
+        self.registers.setCarryFlag((x & 0x01) != 0);
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setSubtractFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        std.debug.assert((result & 0x80) == (x & 0x80));
+        return result;
+    }
+
+    fn srl(self: *CPU, x: u8) u8 {
+        const result = x >> 1;
+        self.registers.setCarryFlag((x & 0x01) != 0);
+        self.registers.setHalfCarryFlag(false);
+        self.registers.setSubtractFlag(false);
+        self.registers.setZeroFlag(result == 0);
+        std.debug.assert((result & 0x80) == 0);
         return result;
     }
 
@@ -365,7 +420,7 @@ pub const CPU = struct {
             },
             0x07 => {
                 // RLCA
-                self.registers.setA(self.rotateLeft(u8, self.registers.a(), 1));
+                self.registers.setA(self.rlc(self.registers.a()));
             },
             0x08 => {
                 // LD (nn),SP
@@ -396,6 +451,10 @@ pub const CPU = struct {
             0x0E => {
                 // LD C,n
                 self.registers.setC(try self.stream.readByte());
+            },
+            0x0F => {
+                // RRCA
+                self.registers.setA(self.rrc(self.registers.a()));
             },
             0x10 => {
                 // STOP
@@ -432,6 +491,10 @@ pub const CPU = struct {
                 // LD D,n
                 self.registers.setD(try self.stream.readByte());
             },
+            0x17 => {
+                // RLA
+                self.registers.setA(self.rl(self.registers.a()));
+            },
             0x19 => {
                 // ADD HL,DE
                 self.registers.hl = self.add(u16, self.registers.hl, self.registers.de);
@@ -455,6 +518,10 @@ pub const CPU = struct {
             0x1E => {
                 // LD E,n
                 self.registers.setE(try self.stream.readByte());
+            },
+            0x1F => {
+                // RRA
+                self.registers.setA(self.rr(self.registers.a()));
             },
             0x21 => {
                 // LD HL,nn
@@ -1160,12 +1227,206 @@ pub const CPU = struct {
                 // ADD A,n
                 self.registers.setA(self.add(u8, self.registers.a(), try self.stream.readByte()));
             },
-            0xD6 => {
-                // SUB A,n
-                self.registers.setA(self.sub(self.registers.a(), try self.stream.readByte()));
-            },
             0xCB => {
                 switch (try self.stream.readByte()) {
+                    0x00 => {
+                        // RLC B
+                        self.registers.setB(self.rlc(self.registers.b()));
+                    },
+                    0x01 => {
+                        // RLC C
+                        self.registers.setC(self.rlc(self.registers.c()));
+                    },
+                    0x02 => {
+                        // RLC D
+                        self.registers.setD(self.rlc(self.registers.d()));
+                    },
+                    0x03 => {
+                        // RLC E
+                        self.registers.setE(self.rlc(self.registers.e()));
+                    },
+                    0x04 => {
+                        // RLC H
+                        self.registers.setH(self.rlc(self.registers.h()));
+                    },
+                    0x05 => {
+                        // RLC L
+                        self.registers.setL(self.rlc(self.registers.l()));
+                    },
+                    0x06 => {
+                        // RLC (HL)
+                        self.memory.set(self.registers.hl,
+                                        self.rlc(self.memory.get(self.registers.hl)));
+                    },
+                    0x07 => {
+                        // RLC A
+                        self.registers.setA(self.rlc(self.registers.a()));
+                    },
+                    0x08 => {
+                        // RRC B
+                        self.registers.setB(self.rrc(self.registers.b()));
+                    },
+                    0x09 => {
+                        // RRC C
+                        self.registers.setC(self.rrc(self.registers.c()));
+                    },
+                    0x0A => {
+                        // RRC D
+                        self.registers.setD(self.rrc(self.registers.d()));
+                    },
+                    0x0B => {
+                        // RRC E
+                        self.registers.setE(self.rrc(self.registers.e()));
+                    },
+                    0x0C => {
+                        // RRC H
+                        self.registers.setH(self.rrc(self.registers.h()));
+                    },
+                    0x0D => {
+                        // RRC L
+                        self.registers.setL(self.rrc(self.registers.l()));
+                    },
+                    0x0E => {
+                        // RRC (HL)
+                        self.memory.set(self.registers.hl,
+                                        self.rrc(self.memory.get(self.registers.hl)));
+                    },
+                    0x0F => {
+                        // RRC A
+                        self.registers.setA(self.rrc(self.registers.a()));
+                    },
+                    0x10 => {
+                        // RL B
+                        self.registers.setB(self.rl(self.registers.b()));
+                    },
+                    0x11 => {
+                        // RL C
+                        self.registers.setC(self.rl(self.registers.c()));
+                    },
+                    0x12 => {
+                        // RL D
+                        self.registers.setD(self.rl(self.registers.d()));
+                    },
+                    0x13 => {
+                        // RL E
+                        self.registers.setE(self.rl(self.registers.e()));
+                    },
+                    0x14 => {
+                        // RL H
+                        self.registers.setH(self.rl(self.registers.h()));
+                    },
+                    0x15 => {
+                        // RL L
+                        self.registers.setL(self.rl(self.registers.l()));
+                    },
+                    0x16 => {
+                        // RL (HL)
+                        self.memory.set(self.registers.hl,
+                                        self.rl(self.memory.get(self.registers.hl)));
+                    },
+                    0x17 => {
+                        // RL A
+                        self.registers.setA(self.rl(self.registers.a()));
+                    },
+                    0x18 => {
+                        // RR B
+                        self.registers.setB(self.rr(self.registers.b()));
+                    },
+                    0x19 => {
+                        // RR C
+                        self.registers.setC(self.rr(self.registers.c()));
+                    },
+                    0x1A => {
+                        // RR D
+                        self.registers.setD(self.rr(self.registers.d()));
+                    },
+                    0x1B => {
+                        // RR E
+                        self.registers.setE(self.rr(self.registers.e()));
+                    },
+                    0x1C => {
+                        // RR H
+                        self.registers.setH(self.rr(self.registers.h()));
+                    },
+                    0x1D => {
+                        // RR L
+                        self.registers.setL(self.rr(self.registers.l()));
+                    },
+                    0x1E => {
+                        // RR (HL)
+                        self.memory.set(self.registers.hl,
+                                        self.rr(self.memory.get(self.registers.hl)));
+                    },
+                    0x1F => {
+                        // RR A
+                        self.registers.setA(self.rr(self.registers.a()));
+                    },
+                    0x20 => {
+                        // SLA B
+                        self.registers.setB(self.sla(self.registers.b()));
+                    },
+                    0x21 => {
+                        // SLA C
+                        self.registers.setC(self.sla(self.registers.c()));
+                    },
+                    0x22 => {
+                        // SLA D
+                        self.registers.setD(self.sla(self.registers.d()));
+                    },
+                    0x23 => {
+                        // SLA E
+                        self.registers.setE(self.sla(self.registers.e()));
+                    },
+                    0x24 => {
+                        // SLA H
+                        self.registers.setH(self.sla(self.registers.h()));
+                    },
+                    0x25 => {
+                        // SLA L
+                        self.registers.setL(self.sla(self.registers.l()));
+                    },
+                    0x26 => {
+                        // SLA (HL)
+                        self.memory.set(self.registers.hl,
+                                        self.sla(self.memory.get(self.registers.hl)));
+                    },
+                    0x27 => {
+                        // SLA A
+                        self.registers.setA(self.sla(self.registers.a()));
+                    },
+                    0x28 => {
+                        // SRA B
+                        self.registers.setB(self.sra(self.registers.b()));
+                    },
+                    0x29 => {
+                        // SRA C
+                        self.registers.setC(self.sra(self.registers.c()));
+                    },
+                    0x2A => {
+                        // SRA D
+                        self.registers.setD(self.sra(self.registers.d()));
+                    },
+                    0x2B => {
+                        // SRA E
+                        self.registers.setE(self.sra(self.registers.e()));
+                    },
+                    0x2C => {
+                        // SRA H
+                        self.registers.setH(self.sra(self.registers.h()));
+                    },
+                    0x2D => {
+                        // SRA L
+                        self.registers.setL(self.sra(self.registers.l()));
+                    },
+                    0x2E => {
+                        // SRA (HL)
+                        self.memory.set(self.registers.hl,
+                                        self.sra(self.memory.get(self.registers.hl)));
+                    },
+                    0x2F => {
+                        // SRA A
+                        self.registers.setA(self.sra(self.registers.a()));
+                    },
                     0x30 => {
                         // SWAP B
                         self.registers.setB(self.swap(self.registers.b()));
@@ -1200,6 +1461,35 @@ pub const CPU = struct {
                         // SWAP A
                         self.registers.setA(self.swap(self.registers.a()));
                     },
+                    0x38 => {
+                        // SRL B
+                        self.registers.setB(self.srl(self.registers.b()));
+                    },
+                    0x39 => {
+                        // SRL C
+                        self.registers.setC(self.srl(self.registers.c()));
+                    },
+                    0x3A => {
+                        // SRL D
+                        self.registers.setD(self.srl(self.registers.d()));
+                    },
+                    0x3B => {
+                        // SRL E
+                        self.registers.setE(self.srl(self.registers.e()));
+                    },
+                    0x3C => {
+                        // SRL H
+                        self.registers.setH(self.srl(self.registers.h()));
+                    },
+                    0x3D => {
+                        // SRL L
+                        self.registers.setL(self.srl(self.registers.l()));
+                    },
+                    0x3E => {
+                        // SRL (HL)
+                        self.memory.set(self.registers.hl,
+                                        self.srl(self.memory.get(self.registers.hl)));
+                    },
                     else => {
                         return ErrorSet.InvalidInstruction;
                     },
@@ -1218,6 +1508,10 @@ pub const CPU = struct {
             0xD5 => {
                 // PUSH DE
                 self.push(self.registers.de);
+            },
+            0xD6 => {
+                // SUB A,n
+                self.registers.setA(self.sub(self.registers.a(), try self.stream.readByte()));
             },
             0xDE => {
                 // SBC A,n
