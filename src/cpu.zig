@@ -503,6 +503,11 @@ pub const CPU = struct {
                 // RLA
                 self.registers.setA(self.rl(self.registers.a()));
             },
+            0x18 => {
+                // JR
+                const n = try self.stream.readByteSigned();
+                self.registers.pc = @truncate(u16, @intCast(u32, i32(self.registers.pc) + i32(n)));
+            },
             0x19 => {
                 // ADD HL,DE
                 self.registers.hl = self.add(u16, self.registers.hl, self.registers.de);
@@ -530,6 +535,10 @@ pub const CPU = struct {
             0x1F => {
                 // RRA
                 self.registers.setA(self.rr(self.registers.a()));
+            },
+            0x20 => {
+                // JR NZ,n
+                
             },
             0x21 => {
                 // LD HL,nn
@@ -1227,6 +1236,17 @@ pub const CPU = struct {
                 // POP BC
                 self.registers.bc = self.pop(u16);
             },
+            0xC2 => {
+                // JP NZ,nn
+                const address = try self.stream.readIntLe(u16);
+                if (!self.registers.zeroFlag()) {
+                    self.registers.pc = address;
+                }
+            },
+            0xC3 => {
+                // JP
+                self.registers.pc = try self.stream.readIntLe(u16);
+            },
             0xC5 => {
                 // PUSH BC
                 self.push(self.registers.bc);
@@ -1234,6 +1254,13 @@ pub const CPU = struct {
             0xC6 => {
                 // ADD A,n
                 self.registers.setA(self.add(u8, self.registers.a(), try self.stream.readByte()));
+            },
+            0xCA => {
+                // JP Z,nn
+                const address = try self.stream.readIntLe(u16);
+                if (self.registers.zeroFlag()) {
+                    self.registers.pc = address;
+                }
             },
             0xCB => {
                 switch (try self.stream.readByte()) {
@@ -1615,6 +1642,13 @@ pub const CPU = struct {
                 // POP DE
                 self.registers.de = self.pop(u16);
             },
+            0xD2 => {
+                // JP NC,nn
+                const address = try self.stream.readIntLe(u16);
+                if (!self.registers.carryFlag()) {
+                    self.registers.pc = address;
+                }
+            },
             0xD5 => {
                 // PUSH DE
                 self.push(self.registers.de);
@@ -1622,6 +1656,13 @@ pub const CPU = struct {
             0xD6 => {
                 // SUB A,n
                 self.registers.setA(self.sub(self.registers.a(), try self.stream.readByte()));
+            },
+            0xDA => {
+                // JP C,nn
+                const address = try self.stream.readIntLe(u16);
+                if (self.registers.carryFlag()) {
+                    self.registers.pc = address;
+                }
             },
             0xDE => {
                 // SBC A,n
@@ -1657,6 +1698,10 @@ pub const CPU = struct {
                 self.registers.sp = self.add(u16,
                     self.registers.sp,
                     try self.stream.readByte());
+            },
+            0xE9 => {
+                // JP (HL)
+                self.registers.pc = self.memory.get(self.registers.hl);
             },
             0xEA => {
                 // LD (nn),A
