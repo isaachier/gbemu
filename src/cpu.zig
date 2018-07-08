@@ -1,6 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const opcode = @import("opcode.zig");
+
 pub const Registers = struct {
     af: u16,
     bc: u16,
@@ -411,73 +413,73 @@ pub const CPU = struct {
     }
 
     pub fn execute(self: *CPU) !Mode {
-        switch (try self.stream.readByte()) {
-            0x00 => {
+        switch (@intToEnum(opcode.Opcode, try self.stream.readByte())) {
+           opcode.Opcode.NOP  => {
                 // NOP
             },
-            0x01 => {
+           opcode.Opcode.LD_BC_nn  => {
                 // LD BC,nn
                 self.registers.bc = try self.stream.readIntLe(u16);
             },
-            0x02 => {
+           opcode.Opcode.LD_BC_A  => {
                 // LD (BC),A
                 self.memory.set(self.registers.bc, self.registers.a());
             },
-            0x03 => {
+           opcode.Opcode.INC_BC  => {
                 // INC BC
                 self.registers.bc = self.add(u16, self.registers.bc, 1);
             },
-            0x04 => {
+           opcode.Opcode.INC_B  => {
                 // INC B
                 self.registers.setB(self.add(u8, self.registers.b(), 1));
             },
-            0x05 => {
+           opcode.Opcode.DEC_B  => {
                 // DEC B
                 self.registers.setB(self.sub(self.registers.b(), 1));
             },
-            0x06 => {
+           opcode.Opcode.LD_B_n  => {
                 // LD B,n
                 self.registers.setB(try self.stream.readByte());
             },
-            0x07 => {
+           opcode.Opcode.RLCA  => {
                 // RLCA
                 self.registers.setA(self.rlc(self.registers.a()));
             },
-            0x08 => {
+           opcode.Opcode.LD_nn_SP  => {
                 // LD (nn),SP
                 const value = try self.stream.readIntLe(u16);
                 self.memory.set(value, @truncate(u8, (self.registers.sp & 0xFF00) >> 8));
                 self.memory.set(value + 1, @truncate(u8, self.registers.sp));
             },
-            0x09 => {
+           opcode.Opcode.ADD_HL_BC  => {
                 // ADD HL,BC
                 self.registers.hl = self.add(u16, self.registers.hl, self.registers.bc);
             },
-            0x0A => {
+           opcode.Opcode.LD_A_BC  => {
                 // LD A,(BC)
                 self.registers.setA(self.memory.get(self.registers.bc));
             },
-            0x0B => {
+           opcode.Opcode.DEC_BC  => {
                 // DEC BC
                 self.registers.bc -%= 1;
             },
-            0x0C => {
+           opcode.Opcode.INC_C  => {
                 // INC C
                 self.registers.setC(self.add(u8, self.registers.c(), 1));
             },
-            0x0D => {
+           opcode.Opcode.DEC_C  => {
                 // DEC D
                 self.registers.setD(self.sub(self.registers.d(), 1));
             },
-            0x0E => {
+           opcode.Opcode.LD_C_n  => {
                 // LD C,n
                 self.registers.setC(try self.stream.readByte());
             },
-            0x0F => {
+           opcode.Opcode.RRCA  => {
                 // RRCA
                 self.registers.setA(self.rrc(self.registers.a()));
             },
-            0x10 => {
+           opcode.Opcode.STOP_FIRST_BYTE  => {
                 // STOP
                 switch (try self.stream.readByte()) {
                     0x00 => {
@@ -488,100 +490,100 @@ pub const CPU = struct {
                     }
                 }
             },
-            0x11 => {
+           opcode.Opcode.LD_DE_nn  => {
                 // LD DE,nn
                 self.registers.de = try self.stream.readIntLe(u16);
             },
-            0x12 => {
+           opcode.Opcode.LD_DE_A  => {
                 // LD (DE),A
                 self.memory.set(self.registers.de, self.registers.a());
             },
-            0x13 => {
+           opcode.Opcode.INC_DE  => {
                 // INC DE
                 self.registers.de = self.add(u16, self.registers.de, 1);
             },
-            0x14 => {
+           opcode.Opcode.INC_D  => {
                 // INC D
                 self.registers.setD(self.add(u8, self.registers.d(), 1));
             },
-            0x15 => {
+           opcode.Opcode.DEC_D  => {
                 // DEC D
                 self.registers.setD(self.sub(self.registers.d(), 1));
             },
-            0x16 => {
+           opcode.Opcode.LD_D_n  => {
                 // LD D,n
                 self.registers.setD(try self.stream.readByte());
             },
-            0x17 => {
+           opcode.Opcode.RLA  => {
                 // RLA
                 self.registers.setA(self.rl(self.registers.a()));
             },
-            0x18 => {
+           opcode.Opcode.JR_n  => {
                 // JR
                 const n = try self.stream.readByteSigned();
                 self.jumpRelative(n);
             },
-            0x19 => {
+           opcode.Opcode.ADD_HL_DE  => {
                 // ADD HL,DE
                 self.registers.hl = self.add(u16, self.registers.hl, self.registers.de);
             },
-            0x1A => {
+           opcode.Opcode.LD_A_DE  => {
                 // LD A,(DE)
                 self.registers.setA(self.memory.get(self.registers.de));
             },
-            0x1B => {
+           opcode.Opcode.DEC_DE  => {
                 // DEC DE
                 self.registers.de -%= 1;
             },
-            0x1C => {
+           opcode.Opcode.INC_E  => {
                 // INC E
                 self.registers.setE(self.add(u8, self.registers.e(), 1));
             },
-            0x1D => {
+           opcode.Opcode.DEC_E  => {
                 // DEC E
                 self.registers.setE(self.sub(self.registers.e(), 1));
             },
-            0x1E => {
+           opcode.Opcode.LD_E_n  => {
                 // LD E,n
                 self.registers.setE(try self.stream.readByte());
             },
-            0x1F => {
+           opcode.Opcode.RRA  => {
                 // RRA
                 self.registers.setA(self.rr(self.registers.a()));
             },
-            0x20 => {
+           opcode.Opcode.JR_NZ_n  => {
                 // JR NZ,n
                 const n = try self.stream.readByteSigned();
                 if (!self.registers.zeroFlag()) {
                     self.jumpRelative(n);
                 }
             },
-            0x21 => {
+           opcode.Opcode.LD_HL_nn  => {
                 // LD HL,nn
                 self.registers.hl = try self.stream.readIntLe(u16);
             },
-            0x22 => {
+           opcode.Opcode.LDI_HL_A  => {
                 // LDI (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.hl +%= 1;
             },
-            0x23 => {
+           opcode.Opcode.INC_HL  => {
                 // INC HL
                 self.registers.hl = self.add(u16, self.registers.hl, 1);
             },
-            0x24 => {
+           opcode.Opcode.INC_H  => {
                 // INC H
                 self.registers.setH(self.add(u8, self.registers.h(), 1));
             },
-            0x25 => {
+           opcode.Opcode.DEC_H  => {
                 // DEC H
                 self.registers.setH(self.sub(self.registers.h(), 1));
             },
-            0x26 => {
+           opcode.Opcode.LD_H_n  => {
                 // LD H,n
                 self.registers.setH(try self.stream.readByte());
             },
-            0x27 => {
+           opcode.Opcode.DAA  => {
                 // DAA
                 var carry = false;
                 if (!self.registers.subtractFlag()) {
@@ -604,738 +606,745 @@ pub const CPU = struct {
                 self.registers.setCarryFlag(carry);
                 self.registers.setHalfCarryFlag(false);
             },
-            0x28 => {
+           opcode.Opcode.JR_Z_n  => {
                 // JR Z,n
                 const n = try self.stream.readByteSigned();
                 if (self.registers.zeroFlag()) {
                     self.jumpRelative(n);
                 }
             },
-            0x29 => {
+           opcode.Opcode.ADD_HL_HL  => {
                 // ADD HL,HL
                 self.registers.hl = self.add(u16, self.registers.hl, self.registers.hl);
             },
-            0x2A => {
+           opcode.Opcode.LDI_A_HL  => {
                 // LDI A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
                 self.registers.hl +%= 1;
             },
-            0x2B => {
+           opcode.Opcode.DEC_HL  => {
                 // DEC HL
                 self.registers.hl -%= 1;
             },
-            0x2C => {
+           opcode.Opcode.INC_L  => {
                 // INC L
                 self.registers.setL(self.add(u8, self.registers.l(), 1));
             },
-            0x2D => {
+           opcode.Opcode.DEC_L  => {
                 // DEC L
                 self.registers.setL(self.sub(self.registers.l(), 1));
             },
-            0x2E => {
+           opcode.Opcode.LD_L_n  => {
                 // LD L,n
                 self.registers.setL(try self.stream.readByte());
             },
-            0x2F => {
+           opcode.Opcode.CPL  => {
                 // CPL
                 self.registers.setA(~self.registers.a());
                 self.registers.setSubtractFlag(true);
                 self.registers.setHalfCarryFlag(true);
             },
-            0x30 => {
+           opcode.Opcode.JR_NC_n  => {
                 // JR NC,n
                 const n = try self.stream.readByteSigned();
                 if (!self.registers.carryFlag()) {
                     self.jumpRelative(n);
                 }
             },
-            0x31 => {
+           opcode.Opcode.LD_SP_nn  => {
                 // LD SP,nn
                 self.registers.sp = try self.stream.readIntLe(u16);
             },
-            0x32 => {
+           opcode.Opcode.LDD_HL_A  => {
                 // LDD (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
                 self.registers.hl -%= 1;
             },
-            0x33 => {
+           opcode.Opcode.INC_SP  => {
                 // INC SP
                 self.registers.sp = self.add(u16, self.registers.sp, 1);
             },
-            0x34 => {
+           opcode.Opcode.INC_mem_HL  => {
                 // INC (HL)
                 self.memory.set(self.registers.hl,
                                 self.add(u8, self.memory.get(self.registers.hl), 1));
             },
-            0x35 => {
+           opcode.Opcode.DEC_mem_HL  => {
                 // DEC (HL)
                 self.memory.set(self.registers.hl,
                                 self.sub(self.memory.get(self.registers.hl), 1));
             },
-            0x36 => {
+           opcode.Opcode.LD_HL_n  => {
                 // LD (HL),n
                 self.memory.set(self.registers.hl, try self.stream.readByte());
             },
-            0x37 => {
+           opcode.Opcode.SCF  => {
                 // SCF
                 self.registers.setSubtractFlag(false);
                 self.registers.setHalfCarryFlag(false);
                 self.registers.setCarryFlag(true);
             },
-            0x38 => {
+           opcode.Opcode.JR_C_n  => {
                 // JR C,n
                 const n = try self.stream.readByteSigned();
                 if (self.registers.carryFlag()) {
                     self.jumpRelative(n);
                 }
             },
-            0x39 => {
+           opcode.Opcode.ADD_HL_SP  => {
                 // ADD HL,SP
                 self.registers.hl = self.add(u16, self.registers.hl, self.registers.sp);
             },
-            0x3A => {
+           opcode.Opcode.LDD_A_HL  => {
                 // LDD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
                 self.registers.hl -%= 1;
             },
-            0x3B => {
+           opcode.Opcode.DEC_SP  => {
                 // DEC HL
                 self.registers.hl -%= 1;
             },
-            0x3C => {
+           opcode.Opcode.INC_A  => {
                 // INC A
                 self.registers.setA(self.add(u8, self.registers.a(), 1));
             },
-            0x3D => {
+           opcode.Opcode.DEC_A  => {
                 // DEC A
                 self.registers.setA(self.sub(self.registers.a(), 1));
             },
-            0x3E => {
+           opcode.Opcode.LD_A_n  => {
                 // LD A,n
                 self.registers.setA(try self.stream.readByte());
             },
-            0x3F => {
+           opcode.Opcode.CCF  => {
                 // CCF
                 self.registers.setSubtractFlag(false);
                 self.registers.setHalfCarryFlag(false);
                 self.registers.setCarryFlag(!self.registers.carryFlag());
             },
-            0x40 => {
+           opcode.Opcode.LD_B_B  => {
                 // LD B,B
                 self.registers.setB(self.registers.b());
             },
-            0x41 => {
+           opcode.Opcode.LD_B_C  => {
                 // LD B,C
                 self.registers.setB(self.registers.c());
             },
-            0x42 => {
+           opcode.Opcode.LD_B_D  => {
                 // LD B,D
                 self.registers.setB(self.registers.d());
             },
-            0x43 => {
+           opcode.Opcode.LD_B_E  => {
                 // LD B,E
                 self.registers.setB(self.registers.e());
             },
-            0x44 => {
+           opcode.Opcode.LD_B_H  => {
                 // LD B,H
                 self.registers.setB(self.registers.h());
             },
-            0x45 => {
+           opcode.Opcode.LD_B_L  => {
                 // LD B,L
                 self.registers.setB(self.registers.l());
             },
-            0x46 => {
+           opcode.Opcode.LD_B_HL  => {
                 // LD B,(HL)
                 self.registers.setB(self.memory.get(self.registers.hl));
             },
-            0x47 => {
+           opcode.Opcode.LD_B_A  => {
                 // LD B,A
                 self.registers.setB(self.registers.a());
             },
-            0x48 => {
+           opcode.Opcode.LD_C_B  => {
                 // LD C,B
                 self.registers.setC(self.registers.b());
             },
-            0x49 => {
+           opcode.Opcode.LD_C_C  => {
                 // LD C,C
                 self.registers.setC(self.registers.c());
             },
-            0x4A => {
+           opcode.Opcode.LD_C_D  => {
                 // LD C,D
                 self.registers.setC(self.registers.d());
             },
-            0x4B => {
+           opcode.Opcode.LD_C_E  => {
                 // LD C,E
                 self.registers.setC(self.registers.e());
             },
-            0x4C => {
+           opcode.Opcode.LD_C_H  => {
                 // LD C,H
                 self.registers.setC(self.registers.h());
             },
-            0x4D => {
+           opcode.Opcode.LD_C_L  => {
                 // LD C,L
                 self.registers.setC(self.registers.l());
             },
-            0x4E => {
+           opcode.Opcode.LD_C_HL  => {
                 // LD C,(HL)
                 self.registers.setC(self.memory.get(self.registers.hl));
             },
-            0x4F => {
+           opcode.Opcode.LD_C_A  => {
                 // LD C,A
                 self.registers.setC(self.registers.a());
             },
-            0x50 => {
+           opcode.Opcode.LD_D_B  => {
                 // LD D,B
                 self.registers.setD(self.registers.b());
             },
-            0x51 => {
+           opcode.Opcode.LD_D_C  => {
                 // LD D,C
                 self.registers.setD(self.registers.c());
             },
-            0x52 => {
+           opcode.Opcode.LD_D_D  => {
                 // LD D,D
                 self.registers.setD(self.registers.d());
             },
-            0x53 => {
+           opcode.Opcode.LD_D_E  => {
                 // LD D,E
                 self.registers.setD(self.registers.e());
             },
-            0x54 => {
+           opcode.Opcode.LD_D_H  => {
                 // LD D,H
                 self.registers.setD(self.registers.h());
             },
-            0x55 => {
+           opcode.Opcode.LD_D_L  => {
                 // LD D,L
                 self.registers.setD(self.registers.l());
             },
-            0x56 => {
+           opcode.Opcode.LD_D_HL  => {
                 // LD D,(HL)
                 self.registers.setD(self.memory.get(self.registers.hl));
             },
-            0x57 => {
+           opcode.Opcode.LD_D_A  => {
                 // LD D,A
                 self.registers.setD(self.registers.a());
             },
-            0x58 => {
+           opcode.Opcode.LD_E_B  => {
                 // LD E,B
                 self.registers.setE(self.registers.b());
             },
-            0x59 => {
+           opcode.Opcode.LD_E_C  => {
                 // LD E,C
                 self.registers.setE(self.registers.c());
             },
-            0x5A => {
+           opcode.Opcode.LD_E_D  => {
                 // LD E,D
                 self.registers.setE(self.registers.d());
             },
-            0x5B => {
+           opcode.Opcode.LD_E_E  => {
                 // LD E,E
                 self.registers.setE(self.registers.e());
             },
-            0x5C => {
+           opcode.Opcode.LD_E_H  => {
                 // LD E,H
                 self.registers.setE(self.registers.h());
             },
-            0x5D => {
+           opcode.Opcode.LD_E_L  => {
                 // LD E,L
                 self.registers.setE(self.registers.l());
             },
-            0x5E => {
+           opcode.Opcode.LD_E_HL  => {
                 // LD E,(HL)
                 self.registers.setE(self.memory.get(self.registers.hl));
             },
-            0x5F => {
+           opcode.Opcode.LD_E_A  => {
                 // LD E,A
                 self.registers.setE(self.registers.a());
             },
-            0x60 => {
+           opcode.Opcode.LD_H_B  => {
                 // LD H,B
                 self.registers.setH(self.registers.b());
             },
-            0x61 => {
+           opcode.Opcode.LD_H_C  => {
                 // LD H,C
                 self.registers.setH(self.registers.c());
             },
-            0x62 => {
+           opcode.Opcode.LD_H_D  => {
                 // LD H,D
                 self.registers.setH(self.registers.d());
             },
-            0x63 => {
+           opcode.Opcode.LD_H_E  => {
                 // LD H,E
                 self.registers.setH(self.registers.e());
             },
-            0x64 => {
+           opcode.Opcode.LD_H_H  => {
                 // LD H,H
                 self.registers.setH(self.registers.h());
             },
-            0x65 => {
+           opcode.Opcode.LD_H_L  => {
                 // LD H,L
                 self.registers.setH(self.registers.l());
             },
-            0x66 => {
+           opcode.Opcode.LD_H_HL  => {
                 // LD H,(HL)
                 self.registers.setH(self.memory.get(self.registers.hl));
             },
-            0x67 => {
+           opcode.Opcode.LD_H_A  => {
                 // LD H,A
                 self.registers.setH(self.registers.a());
             },
-            0x68 => {
+           opcode.Opcode.LD_L_B  => {
                 // LD L,B
                 self.registers.setL(self.registers.b());
             },
-            0x69 => {
+           opcode.Opcode.LD_L_C  => {
                 // LD L,C
                 self.registers.setL(self.registers.c());
             },
-            0x6A => {
+           opcode.Opcode.LD_L_D  => {
                 // LD L,D
                 self.registers.setL(self.registers.d());
             },
-            0x6B => {
+           opcode.Opcode.LD_L_E  => {
                 // LD L,E
                 self.registers.setL(self.registers.e());
             },
-            0x6C => {
+           opcode.Opcode.LD_L_H  => {
                 // LD L,H
                 self.registers.setL(self.registers.h());
             },
-            0x6D => {
+           opcode.Opcode.LD_L_L  => {
                 // LD L,L
                 self.registers.setL(self.registers.l());
             },
-            0x6E => {
+           opcode.Opcode.LD_L_HL  => {
                 // LD L,(HL)
                 self.registers.setL(self.memory.get(self.registers.hl));
             },
-            0x6F => {
+           opcode.Opcode.LD_L_A  => {
                 // LD L,A
                 self.registers.setL(self.registers.a());
             },
-            0x70 => {
+           opcode.Opcode.LD_HL_B  => {
                 // LD (HL),B
                 self.memory.set(self.registers.hl, self.registers.b());
             },
-            0x71 => {
+           opcode.Opcode.LD_HL_C  => {
                 // LD (HL),C
                 self.memory.set(self.registers.hl, self.registers.c());
             },
-            0x72 => {
+           opcode.Opcode.LD_HL_D  => {
                 // LD (HL),D
                 self.memory.set(self.registers.hl, self.registers.d());
             },
-            0x73 => {
+           opcode.Opcode.LD_HL_E  => {
                 // LD (HL),E
                 self.memory.set(self.registers.hl, self.registers.e());
             },
-            0x74 => {
+           opcode.Opcode.LD_HL_H  => {
                 // LD (HL),H
                 self.memory.set(self.registers.hl, self.registers.h());
             },
-            0x75 => {
+           opcode.Opcode.LD_HL_L  => {
                 // LD (HL),L
                 self.memory.set(self.registers.hl, self.registers.l());
             },
-            0x76 => {
+           opcode.Opcode.HALT  => {
                 // HALT
                 return Mode.Halt;
             },
-            0x77 => {
+           opcode.Opcode.LD_HL_A  => {
                 // LD (HL),A
                 self.memory.set(self.registers.hl, self.registers.a());
             },
-            0x78 => {
+           opcode.Opcode.LD_A_B  => {
                 // LD A,B
                 self.registers.setA(self.registers.b());
             },
-            0x79 => {
+           opcode.Opcode.LD_A_C  => {
                 // LD A,C
                 self.registers.setA(self.registers.c());
             },
-            0x7A => {
+           opcode.Opcode.LD_A_D  => {
                 // LD A,D
                 self.registers.setA(self.registers.d());
             },
-            0x7B => {
+           opcode.Opcode.LD_A_E  => {
                 // LD A,E
                 self.registers.setA(self.registers.e());
             },
-            0x7C => {
+           opcode.Opcode.LD_A_H  => {
                 // LD A,H
                 self.registers.setA(self.registers.h());
             },
-            0x7D => {
+           opcode.Opcode.LD_A_L  => {
                 // LD A,L
                 self.registers.setA(self.registers.l());
             },
-            0x7E => {
+           opcode.Opcode.LD_A_HL  => {
                 // LD A,(HL)
                 self.registers.setA(self.memory.get(self.registers.hl));
             },
-            0x80 => {
+           opcode.Opcode.ADD_A_B  => {
                 // ADD A,B
                 self.registers.setA(self.add(u8, self.registers.a(), self.registers.b()));
             },
-            0x81 => {
+           opcode.Opcode.ADD_A_C  => {
                 // ADD A,C
                 self.registers.setA(self.add(u8, self.registers.a(), self.registers.c()));
             },
-            0x82 => {
+           opcode.Opcode.ADD_A_D  => {
                 // ADD A,D
                 self.registers.setA(self.add(u8, self.registers.a(), self.registers.d()));
             },
-            0x83 => {
+           opcode.Opcode.ADD_A_E  => {
                 // ADD A,E
                 self.registers.setA(self.add(u8, self.registers.a(), self.registers.e()));
             },
-            0x84 => {
+           opcode.Opcode.ADD_A_H  => {
                 // ADD A,H
                 self.registers.setA(self.add(u8, self.registers.a(), self.registers.h()));
             },
-            0x85 => {
+           opcode.Opcode.ADD_A_L  => {
                 // ADD A,L
                 self.registers.setA(self.add(u8, self.registers.a(), self.registers.l()));
             },
-            0x86 => {
+           opcode.Opcode.ADD_A_HL  => {
                 // ADD A,(HL)
                 self.registers.setA(self.add(u8, self.registers.a(),
                                              self.memory.get(self.registers.hl)));
             },
-            0x87 => {
+           opcode.Opcode.ADD_A_A  => {
                 // ADD A,A
                 self.registers.setA(self.add(u8, self.registers.a(), self.registers.a()));
             },
-            0x88 => {
+           opcode.Opcode.ADC_A_B  => {
                 // ADC A,B
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.b() + @boolToInt(self.registers.carryFlag())));
             },
-            0x89 => {
+           opcode.Opcode.ADC_A_C  => {
                 // ADC A,C
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.c() + @boolToInt(self.registers.carryFlag())));
             },
-            0x8A => {
+           opcode.Opcode.ADC_A_D  => {
                 // ADC A,D
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.d() + @boolToInt(self.registers.carryFlag())));
             },
-            0x8B => {
+           opcode.Opcode.ADC_A_E  => {
                 // ADC A,E
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.e() + @boolToInt(self.registers.carryFlag())));
             },
-            0x8C => {
+           opcode.Opcode.ADC_A_H  => {
                 // ADC A,H
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.h() + @boolToInt(self.registers.carryFlag())));
             },
-            0x8D => {
+           opcode.Opcode.ADC_A_L  => {
                 // ADC A,L
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.l() + @boolToInt(self.registers.carryFlag())));
             },
-            0x8E => {
+           opcode.Opcode.ADC_A_HL  => {
                 // ADC A,(HL)
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.memory.get(self.registers.hl) + @boolToInt(self.registers.carryFlag())));
             },
-            0x8F => {
+           opcode.Opcode.ADC_A_A  => {
                 // ADC A,A
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     self.registers.a() + @boolToInt(self.registers.carryFlag())));
             },
-            0x90 => {
+           opcode.Opcode.SUB_A_B  => {
                 // SUB A,B
                 self.registers.setA(self.sub(self.registers.a(), self.registers.b()));
             },
-            0x91 => {
+           opcode.Opcode.SUB_A_C  => {
                 // SUB A,C
                 self.registers.setA(self.sub(self.registers.a(), self.registers.c()));
             },
-            0x92 => {
+           opcode.Opcode.SUB_A_D  => {
                 // SUB A,D
                 self.registers.setA(self.sub(self.registers.a(), self.registers.d()));
             },
-            0x93 => {
+           opcode.Opcode.SUB_A_E  => {
                 // SUB A,E
                 self.registers.setA(self.sub(self.registers.a(), self.registers.e()));
             },
-            0x94 => {
+           opcode.Opcode.SUB_A_H  => {
                 // SUB A,H
                 self.registers.setA(self.sub(self.registers.a(), self.registers.h()));
             },
-            0x95 => {
+           opcode.Opcode.SUB_A_L  => {
                 // SUB A,L
                 self.registers.setA(self.sub(self.registers.a(), self.registers.l()));
             },
-            0x96 => {
+           opcode.Opcode.SUB_A_HL  => {
                 // SUB A,(HL)
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.memory.get(self.registers.hl)));
             },
-            0x97 => {
+           opcode.Opcode.SUB_A_A  => {
                 // SUB A,A
                 self.registers.setA(self.sub(self.registers.a(), self.registers.a()));
             },
-            0x98 => {
+           opcode.Opcode.SBC_A_B  => {
                 // SBC A,B
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.registers.b() + @boolToInt(self.registers.carryFlag())));
             },
-            0x99 => {
+           opcode.Opcode.SBC_A_C  => {
                 // SBC A,C
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.registers.c() + @boolToInt(self.registers.carryFlag())));
             },
-            0x9A => {
+           opcode.Opcode.SBC_A_D  => {
                 // SBC A,D
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.registers.d() + @boolToInt(self.registers.carryFlag())));
             },
-            0x9B => {
+           opcode.Opcode.SBC_A_E  => {
                 // SBC A,E
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.registers.e() + @boolToInt(self.registers.carryFlag())));
             },
-            0x9C => {
+           opcode.Opcode.SBC_A_H  => {
                 // SBC A,H
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.registers.h() + @boolToInt(self.registers.carryFlag())));
             },
-            0x9D => {
+           opcode.Opcode.SBC_A_L  => {
                 // SBC A,L
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.registers.l() + @boolToInt(self.registers.carryFlag())));
             },
-            0x9E => {
+           opcode.Opcode.SBC_A_HL  => {
                 // SBC A,(HL)
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.memory.get(self.registers.hl) + @boolToInt(self.registers.carryFlag())));
             },
-            0x9F => {
+           opcode.Opcode.SBC_A_A  => {
                 // SBC A,A
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     self.registers.a() + @boolToInt(self.registers.carryFlag())));
             },
-            0xA0 => {
+           opcode.Opcode.AND_A_B  => {
                 // AND A,B
                 self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.b()));
             },
-            0xA1 => {
+           opcode.Opcode.AND_A_C  => {
                 // AND A,C
                 self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.c()));
             },
-            0xA2 => {
+           opcode.Opcode.AND_A_D  => {
                 // AND A,D
                 self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.d()));
             },
-            0xA3 => {
+           opcode.Opcode.AND_A_E  => {
                 // AND A,E
                 self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.e()));
             },
-            0xA4 => {
+           opcode.Opcode.AND_A_H  => {
                 // AND A,H
                 self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.h()));
             },
-            0xA5 => {
+           opcode.Opcode.AND_A_L  => {
                 // AND A,L
                 self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.l()));
             },
-            0xA6 => {
+           opcode.Opcode.AND_A_HL  => {
                 // AND A,(HL)
                 self.registers.setA(self.bitwiseAnd(
                     self.registers.a(),
                     self.memory.get(self.registers.hl)));
             },
-            0xA7 => {
+           opcode.Opcode.AND_A_A  => {
                 // AND A,A
                 self.registers.setA(self.bitwiseAnd(self.registers.a(), self.registers.a()));
             },
-            0xA8 => {
+           opcode.Opcode.XOR_A_B  => {
                 // XOR A,B
                 self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.b()));
             },
-            0xA9 => {
+           opcode.Opcode.XOR_A_C  => {
                 // XOR A,C
                 self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.c()));
             },
-            0xAA => {
+           opcode.Opcode.XOR_A_D  => {
                 // XOR A,D
                 self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.d()));
             },
-            0xAB => {
+           opcode.Opcode.XOR_A_E  => {
                 // XOR A,E
                 self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.e()));
             },
-            0xAC => {
+           opcode.Opcode.XOR_A_H  => {
                 // XOR A,H
                 self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.h()));
             },
-            0xAD => {
+           opcode.Opcode.XOR_A_L  => {
                 // XOR A,L
                 self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.l()));
             },
-            0xAE => {
+           opcode.Opcode.XOR_A_HL  => {
                 // XOR A,(HL)
                 self.registers.setA(self.bitwiseXor(
                     self.registers.a(),
                     self.memory.get(self.registers.hl)));
             },
-            0xAF => {
+           opcode.Opcode.XOR_A_A  => {
                 // XOR A,A
                 self.registers.setA(self.bitwiseXor(self.registers.a(), self.registers.a()));
             },
-            0xB0 => {
+           opcode.Opcode.OR_A_B  => {
                 // OR A,B
                 self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.b()));
             },
-            0xB1 => {
+           opcode.Opcode.OR_A_C  => {
                 // OR A,C
                 self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.c()));
             },
-            0xB2 => {
+           opcode.Opcode.OR_A_D  => {
                 // OR A,D
                 self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.d()));
             },
-            0xB3 => {
+           opcode.Opcode.OR_A_E  => {
                 // OR A,E
                 self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.e()));
             },
-            0xB4 => {
+           opcode.Opcode.OR_A_H  => {
                 // OR A,H
                 self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.h()));
             },
-            0xB5 => {
+           opcode.Opcode.OR_A_L  => {
                 // OR A,L
                 self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.l()));
             },
-            0xB6 => {
+           opcode.Opcode.OR_A_HL  => {
                 // OR A,(HL)
                 self.registers.setA(self.bitwiseOr(
                     self.registers.a(),
                     self.memory.get(self.registers.hl)));
             },
-            0xB7 => {
+           opcode.Opcode.OR_A_A  => {
                 // OR A,A
                 self.registers.setA(self.bitwiseOr(self.registers.a(), self.registers.a()));
             },
-            0xB8 => {
+           opcode.Opcode.CP_A_B  => {
                 // CP A,B
                 _ = self.sub(self.registers.a(), self.registers.b());
             },
-            0xB9 => {
+           opcode.Opcode.CP_A_C  => {
                 // CP A,C
                 _ = self.sub(self.registers.a(), self.registers.c());
             },
-            0xBA => {
+           opcode.Opcode.CP_A_D  => {
                 // CP A,D
                 _ = self.sub(self.registers.a(), self.registers.d());
             },
-            0xBB => {
+           opcode.Opcode.CP_A_E  => {
                 // CP A,E
                 _ = self.sub(self.registers.a(), self.registers.e());
             },
-            0xBC => {
+           opcode.Opcode.CP_A_H  => {
                 // CP A,H
                 _ = self.sub(self.registers.a(), self.registers.h());
             },
-            0xBD => {
+           opcode.Opcode.CP_A_L  => {
                 // CP A,B
                 _ = self.sub(self.registers.a(), self.registers.l());
             },
-            0xBE => {
+           opcode.Opcode.CP_A_HL  => {
                 // CP A,B
                 _ = self.sub(self.registers.a(), self.memory.get(self.registers.hl));
             },
-            0xBF => {
+           opcode.Opcode.CP_A_A  => {
                 // CP A,A
                 _ = self.sub(self.registers.a(), self.registers.a());
             },
-            0xC0 => {
+           opcode.Opcode.RET_NZ_nn  => {
                 // RET NZ
                 if (!self.registers.zeroFlag()) {
                     self.registers.pc = self.pop(u16);
                 }
             },
-            0xC1 => {
+           opcode.Opcode.POP_BC  => {
                 // POP BC
                 self.registers.bc = self.pop(u16);
             },
-            0xC2 => {
+           opcode.Opcode.JP_NZ_nn  => {
                 // JP NZ,nn
                 const address = try self.stream.readIntLe(u16);
                 if (!self.registers.zeroFlag()) {
                     self.registers.pc = address;
                 }
             },
-            0xC3 => {
+           opcode.Opcode.JP_nn  => {
                 // JP
                 self.registers.pc = try self.stream.readIntLe(u16);
             },
-            0xC4 => {
+           opcode.Opcode.CALL_NZ_nn  => {
                 // CALL NZ,nn
                 if (!self.registers.zeroFlag()) {
                     self.call(try self.stream.readIntLe(u16));
                 }
             },
-            0xC5 => {
+           opcode.Opcode.PUSH_BC  => {
                 // PUSH BC
                 self.push(self.registers.bc);
             },
-            0xC6 => {
+           opcode.Opcode.ADC_A_n  => {
                 // ADD A,n
                 self.registers.setA(self.add(u8, self.registers.a(), try self.stream.readByte()));
             },
-            0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF => |opcode| {
+           opcode.Opcode.RST_00,
+           opcode.Opcode.RST_08,
+           opcode.Opcode.RST_10,
+           opcode.Opcode.RST_18,
+           opcode.Opcode.RST_20,
+           opcode.Opcode.RST_28,
+           opcode.Opcode.RST_30,
+           opcode.Opcode.RST_38 => |op| {
                 // RST n
-                self.registers.pc = switch (opcode) {
-                    0xC7 => u16(0x00),
-                    0xCF => u16(0x08),
-                    0xD7 => u16(0x10),
-                    0xDF => u16(0x18),
-                    0xE7 => u16(0x20),
-                    0xEF => u16(0x28),
-                    0xF7 => u16(0x30),
-                    0xFF => u16(0x38),
+                self.registers.pc = switch (op) {
+                    opcode.Opcode.RST_00 => u16(0x00),
+                    opcode.Opcode.RST_08 => u16(0x08),
+                    opcode.Opcode.RST_10 => u16(0x10),
+                    opcode.Opcode.RST_18 => u16(0x18),
+                    opcode.Opcode.RST_20 => u16(0x20),
+                    opcode.Opcode.RST_28 => u16(0x28),
+                    opcode.Opcode.RST_30 => u16(0x30),
+                    opcode.Opcode.RST_38 => u16(0x38),
                     else => unreachable,
                 };
             },
-            0xC8 => {
+           opcode.Opcode.RET_Z_nn  => {
                 // RET Z
                 if (self.registers.zeroFlag()) {
                     self.registers.pc = self.pop(u16);
                 }
             },
-            0xC9 => {
+           opcode.Opcode.RET_nn  => {
                 // RET
                 self.registers.pc = self.pop(u16);
             },
-            0xCA => {
+           opcode.Opcode.JP_Z_nn  => {
                 // JP Z,nn
                 const address = try self.stream.readIntLe(u16);
                 if (self.registers.zeroFlag()) {
                     self.registers.pc = address;
                 }
             },
-            0xCB => {
+           opcode.Opcode.MISC  => {
                 switch (try self.stream.readByte()) {
                     0x00 => {
                         // RLC B
@@ -1705,170 +1714,170 @@ pub const CPU = struct {
                     },
                 }
             },
-            0xCC => {
+           opcode.Opcode.CALL_Z_nn  => {
                 // CALL Z,nn
                 if (self.registers.zeroFlag()) {
                     self.call(try self.stream.readIntLe(u16));
                 }
             },
-            0xCD => {
+           opcode.Opcode.CALL_nn  => {
                 // CALL nn
                 self.call(try self.stream.readIntLe(u16));
             },
-            0xCE => {
+           opcode.Opcode.ADD_A_n  => {
                 // ADC A,n
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     (try self.stream.readByte()) + @boolToInt(self.registers.carryFlag())));
             },
-            0xD0 => {
+           opcode.Opcode.RET_NC_nn  => {
                 // RET NC
                 if (!self.registers.carryFlag()) {
                     self.registers.pc = self.pop(u16);
                 }
             },
-            0xD1 => {
+           opcode.Opcode.POP_DE  => {
                 // POP DE
                 self.registers.de = self.pop(u16);
             },
-            0xD2 => {
+           opcode.Opcode.JP_NC_nn  => {
                 // JP NC,nn
                 const address = try self.stream.readIntLe(u16);
                 if (!self.registers.carryFlag()) {
                     self.registers.pc = address;
                 }
             },
-            0xD4 => {
+           opcode.Opcode.CALL_NC_nn  => {
                 // CALL NC,nn
                 if (!self.registers.carryFlag()) {
                     self.call(try self.stream.readIntLe(u16));
                 }
             },
-            0xD5 => {
+           opcode.Opcode.PUSH_DE  => {
                 // PUSH DE
                 self.push(self.registers.de);
             },
-            0xD6 => {
+           opcode.Opcode.SBC_A_n  => {
                 // SUB A,n
                 self.registers.setA(self.sub(self.registers.a(), try self.stream.readByte()));
             },
-            0xD8 => {
+           opcode.Opcode.RET_C_nn  => {
                 // RET C
                 if (self.registers.carryFlag()) {
                     self.registers.pc = self.pop(u16);
                 }
             },
-            0xD9 => {
+           opcode.Opcode.RETI  => {
                 // RETI
                 self.registers.pc = self.pop(u16);
                 return Mode.EnableInterrupts;
             },
-            0xDA => {
+           opcode.Opcode.JP_C_nn  => {
                 // JP C,nn
                 const address = try self.stream.readIntLe(u16);
                 if (self.registers.carryFlag()) {
                     self.registers.pc = address;
                 }
             },
-            0xDC => {
+           opcode.Opcode.CALL_C_nn  => {
                 // CALL C,nn
                 if (self.registers.carryFlag()) {
                     self.call(try self.stream.readIntLe(u16));
                 }
             },
-            0xDE => {
+           opcode.Opcode.SUB_A_n  => {
                 // SBC A,n
                 self.registers.setA(self.sub(
                     self.registers.a(),
                     (try self.stream.readByte()) + @boolToInt(self.registers.carryFlag())));
             },
-            0xE0 => {
+           opcode.Opcode.LDH_n_A  => {
                 // LDH ($FF00+n),A
                 self.memory.set(0xFF00 | u16(try self.stream.readByte()),
                                 self.registers.a());
             },
-            0xE1 => {
+           opcode.Opcode.POP_HL  => {
                 // POP HL
                 self.registers.hl = self.pop(u16);
             },
-            0xE2 => {
+           opcode.Opcode.LD_mem_C_A  => {
                 // LD ($FF00+C),A
                 self.memory.set(0xFF00 | u16(self.registers.c()), self.registers.a());
             },
-            0xE5 => {
+           opcode.Opcode.PUSH_HL  => {
                 // PUSH HL
                 self.push(self.registers.hl);
             },
-            0xE6 => {
+           opcode.Opcode.AND_A_n  => {
                 // AND A,n
                 self.registers.setA(self.bitwiseAnd(
                     self.registers.a(),
                     try self.stream.readByte()));
             },
-            0xE8 => {
+           opcode.Opcode.ADD_SP_n  => {
                 // ADD SP,n
                 self.registers.sp = self.add(u16,
                     self.registers.sp,
                     try self.stream.readByte());
             },
-            0xE9 => {
+           opcode.Opcode.JP_HL  => {
                 // JP (HL)
                 self.registers.pc = self.memory.get(self.registers.hl);
             },
-            0xEA => {
+           opcode.Opcode.LD_nn_A  => {
                 // LD (nn),A
                 self.memory.set(try self.stream.readIntLe(u16), self.registers.a());
             },
-            0xEE => {
+           opcode.Opcode.XOR_A_n  => {
                 // XOR A,n
                 self.registers.setA(self.bitwiseXor(
                     self.registers.a(),
                     try self.stream.readByte()));
             },
-            0xF0 => {
+           opcode.Opcode.LDH_A_n  => {
                 // LDH A,($FF00+n)
                 self.registers.setA(self.memory.get(0xFF00 | u16(try self.stream.readByte())));
             },
-            0xF1 => {
+           opcode.Opcode.POP_AF  => {
                 // POP AF
                 self.registers.af = self.pop(u16);
             },
-            0xF2 => {
+           opcode.Opcode.LD_A_mem_C  => {
                 // LD A,($FF00+C)
                 self.registers.setA(self.memory.get(u16(0xFF00) | self.registers.c()));
             },
-            0xF3 => {
+           opcode.Opcode.DI  => {
                 // DI
                 return Mode.DisableInterrupts;
             },
-            0xF5 => {
+           opcode.Opcode.PUSH_AF  => {
                 // PUSH AF
                 self.push(self.registers.af);
             },
-            0xF6 => {
+           opcode.Opcode.OR_A_n  => {
                 // OR A,n
                 self.registers.setA(self.bitwiseOr(
                     self.registers.a(),
                     try self.stream.readByte()));
             },
-            0xF8 => {
+           opcode.Opcode.LDHL_SP_n  => {
                 // LDHL SP,n
                 const n = try self.stream.readByte();
                 self.registers.hl = self.add(u8, @truncate(u8, self.registers.sp), n);
             },
-            0xF9 => {
+           opcode.Opcode.LD_SP_HL  => {
                 // LD SP,HL
                 self.registers.sp = self.registers.hl;
             },
-            0xFA => {
+           opcode.Opcode.LD_A_nn  => {
                 // LD A,(HL)
                 const address = try self.stream.readIntLe(u16);
                 self.registers.setA(self.memory.get(address));
             },
-            0xFB => {
+           opcode.Opcode.EI  => {
                 return Mode.EnableInterrupts;
             },
-            0xFE => {
+           opcode.Opcode.CP_A_n  => {
                 // CP A,n
                 _ = self.sub(self.registers.a(), try self.stream.readByte());
             },
@@ -1895,3 +1904,4 @@ test "CPU" {
     std.debug.assert(cpu.registers.halfCarryFlag());
     cpu.deinit();
 }
+
