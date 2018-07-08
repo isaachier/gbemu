@@ -11,8 +11,8 @@ pub fn main() !void {
     }
     defer c.SDL_Quit();
 
-    const screen_width = 256;
-    const screen_height = 256;
+    const screen_width = 160;
+    const screen_height = 144;
     const undefined_pos = 0x1FFF0000;
 
     const window = c.SDL_CreateWindow(
