@@ -397,8 +397,22 @@ pub const CPU = struct {
         self.registers.setHalfCarryFlag(true);
     }
 
+    fn jumpRelative(self: *CPU, n: i8) void {
+        const UnsignedAddress = @typeOf(self.registers.pc);
+        const SignedAddress = @IntType(true, UnsignedAddress.bit_count << 1);
+        const result = @intCast(SignedAddress, self.registers.pc) + n;
+        self.registers.pc = @truncate(u16, @intCast(UnsignedAddress, result));
+    }
+
+    fn call(self: *CPU, call_address: u16) void {
+        const return_address : u16 = self.registers.pc + 1;
+        self.push(return_address);
+        self.registers.pc = call_address;
+    }
+
     pub fn execute(self: *CPU) !Mode {
-        switch (try self.stream.readByte()) {
+        const opcode = try self.stream.readByte();
+        switch (opcode) {
             0x00 => {
                 // NOP
             },
@@ -506,7 +520,7 @@ pub const CPU = struct {
             0x18 => {
                 // JR
                 const n = try self.stream.readByteSigned();
-                self.registers.pc = @truncate(u16, @intCast(u32, i32(self.registers.pc) + i32(n)));
+                self.jumpRelative(n);
             },
             0x19 => {
                 // ADD HL,DE
@@ -538,7 +552,10 @@ pub const CPU = struct {
             },
             0x20 => {
                 // JR NZ,n
-                
+                const n = try self.stream.readByteSigned();
+                if (!self.registers.zeroFlag()) {
+                    self.jumpRelative(n);
+                }
             },
             0x21 => {
                 // LD HL,nn
@@ -588,6 +605,13 @@ pub const CPU = struct {
                 self.registers.setCarryFlag(carry);
                 self.registers.setHalfCarryFlag(false);
             },
+            0x28 => {
+                // JR Z,n
+                const n = try self.stream.readByteSigned();
+                if (self.registers.zeroFlag()) {
+                    self.jumpRelative(n);
+                }
+            },
             0x29 => {
                 // ADD HL,HL
                 self.registers.hl = self.add(u16, self.registers.hl, self.registers.hl);
@@ -618,6 +642,13 @@ pub const CPU = struct {
                 self.registers.setA(~self.registers.a());
                 self.registers.setSubtractFlag(true);
                 self.registers.setHalfCarryFlag(true);
+            },
+            0x30 => {
+                // JR NC,n
+                const n = try self.stream.readByteSigned();
+                if (!self.registers.carryFlag()) {
+                    self.jumpRelative(n);
+                }
             },
             0x31 => {
                 // LD SP,nn
@@ -651,6 +682,13 @@ pub const CPU = struct {
                 self.registers.setSubtractFlag(false);
                 self.registers.setHalfCarryFlag(false);
                 self.registers.setCarryFlag(true);
+            },
+            0x38 => {
+                // JR C,n
+                const n = try self.stream.readByteSigned();
+                if (self.registers.carryFlag()) {
+                    self.jumpRelative(n);
+                }
             },
             0x39 => {
                 // ADD HL,SP
@@ -1232,6 +1270,12 @@ pub const CPU = struct {
                 // CP A,A
                 _ = self.sub(self.registers.a(), self.registers.a());
             },
+            0xC0 => {
+                // RET NZ
+                if (!self.registers.zeroFlag()) {
+                    self.registers.pc = self.pop(u16);
+                }
+            },
             0xC1 => {
                 // POP BC
                 self.registers.bc = self.pop(u16);
@@ -1247,6 +1291,12 @@ pub const CPU = struct {
                 // JP
                 self.registers.pc = try self.stream.readIntLe(u16);
             },
+            0xC4 => {
+                // CALL NZ,nn
+                if (!self.registers.zeroFlag()) {
+                    self.call(try self.stream.readIntLe(u16));
+                }
+            },
             0xC5 => {
                 // PUSH BC
                 self.push(self.registers.bc);
@@ -1254,6 +1304,20 @@ pub const CPU = struct {
             0xC6 => {
                 // ADD A,n
                 self.registers.setA(self.add(u8, self.registers.a(), try self.stream.readByte()));
+            },
+            0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF => {
+                // RST n
+                self.registers.pc = opcode;
+            },
+            0xC8 => {
+                // RET Z
+                if (self.registers.zeroFlag()) {
+                    self.registers.pc = self.pop(u16);
+                }
+            },
+            0xC9 => {
+                // RET
+                self.registers.pc = self.pop(u16);
             },
             0xCA => {
                 // JP Z,nn
@@ -1632,11 +1696,27 @@ pub const CPU = struct {
                     },
                 }
             },
+            0xCC => {
+                // CALL Z,nn
+                if (self.registers.zeroFlag()) {
+                    self.call(try self.stream.readIntLe(u16));
+                }
+            },
+            0xCD => {
+                // CALL nn
+                self.call(try self.stream.readIntLe(u16));
+            },
             0xCE => {
                 // ADC A,n
                 self.registers.setA(self.add(u8,
                     self.registers.a(),
                     (try self.stream.readByte()) + @boolToInt(self.registers.carryFlag())));
+            },
+            0xD0 => {
+                // RET NC
+                if (!self.registers.carryFlag()) {
+                    self.registers.pc = self.pop(u16);
+                }
             },
             0xD1 => {
                 // POP DE
@@ -1649,6 +1729,12 @@ pub const CPU = struct {
                     self.registers.pc = address;
                 }
             },
+            0xD4 => {
+                // CALL NC,nn
+                if (!self.registers.carryFlag()) {
+                    self.call(try self.stream.readIntLe(u16));
+                }
+            },
             0xD5 => {
                 // PUSH DE
                 self.push(self.registers.de);
@@ -1657,11 +1743,28 @@ pub const CPU = struct {
                 // SUB A,n
                 self.registers.setA(self.sub(self.registers.a(), try self.stream.readByte()));
             },
+            0xD8 => {
+                // RET C
+                if (self.registers.carryFlag()) {
+                    self.registers.pc = self.pop(u16);
+                }
+            },
+            0xD9 => {
+                // RETI
+                self.registers.pc = self.pop(u16);
+                return Mode.EnableInterrupts;
+            },
             0xDA => {
                 // JP C,nn
                 const address = try self.stream.readIntLe(u16);
                 if (self.registers.carryFlag()) {
                     self.registers.pc = address;
+                }
+            },
+            0xDC => {
+                // CALL C,nn
+                if (self.registers.carryFlag()) {
+                    self.call(try self.stream.readIntLe(u16));
                 }
             },
             0xDE => {
