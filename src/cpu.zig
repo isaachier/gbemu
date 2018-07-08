@@ -411,8 +411,7 @@ pub const CPU = struct {
     }
 
     pub fn execute(self: *CPU) !Mode {
-        const opcode = try self.stream.readByte();
-        switch (opcode) {
+        switch (try self.stream.readByte()) {
             0x00 => {
                 // NOP
             },
@@ -1305,9 +1304,19 @@ pub const CPU = struct {
                 // ADD A,n
                 self.registers.setA(self.add(u8, self.registers.a(), try self.stream.readByte()));
             },
-            0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF => {
+            0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF => |opcode| {
                 // RST n
-                self.registers.pc = opcode;
+                self.registers.pc = switch (opcode) {
+                    0xC7 => u16(0x00),
+                    0xCF => u16(0x08),
+                    0xD7 => u16(0x10),
+                    0xDF => u16(0x18),
+                    0xE7 => u16(0x20),
+                    0xEF => u16(0x28),
+                    0xF7 => u16(0x30),
+                    0xFF => u16(0x38),
+                    else => unreachable,
+                };
             },
             0xC8 => {
                 // RET Z
