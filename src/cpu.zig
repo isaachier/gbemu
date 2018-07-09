@@ -208,7 +208,6 @@ pub const Memory = struct {
 };
 
 pub const CPU = struct {
-    pub const ErrorSet = error{InvalidInstruction};
     pub const Stream = std.io.InStream(error{});
     pub const EmptyErrorSet = error{};
     pub const Mode = enum {
@@ -484,7 +483,7 @@ pub const CPU = struct {
                         return Mode.Stop;
                     },
                     else => {
-                        return ErrorSet.InvalidInstruction;
+                        unreachable;
                     },
                 }
             },
@@ -1293,361 +1292,361 @@ pub const CPU = struct {
                 }
             },
             opcode.Opcode.MISC => {
-                switch (try self.stream.readByte()) {
-                    0x00 => {
+                switch (@intToEnum(opcode.MiscOpcode, try self.stream.readByte())) {
+                    opcode.MiscOpcode.RLC_B => {
                         // RLC B
                         self.registers.setB(self.rlc(self.registers.b()));
                     },
-                    0x01 => {
+                    opcode.MiscOpcode.RLC_C => {
                         // RLC C
                         self.registers.setC(self.rlc(self.registers.c()));
                     },
-                    0x02 => {
+                    opcode.MiscOpcode.RLC_D => {
                         // RLC D
                         self.registers.setD(self.rlc(self.registers.d()));
                     },
-                    0x03 => {
+                    opcode.MiscOpcode.RLC_E => {
                         // RLC E
                         self.registers.setE(self.rlc(self.registers.e()));
                     },
-                    0x04 => {
+                    opcode.MiscOpcode.RLC_H => {
                         // RLC H
                         self.registers.setH(self.rlc(self.registers.h()));
                     },
-                    0x05 => {
+                    opcode.MiscOpcode.RLC_L => {
                         // RLC L
                         self.registers.setL(self.rlc(self.registers.l()));
                     },
-                    0x06 => {
+                    opcode.MiscOpcode.RLC_HL => {
                         // RLC (HL)
                         self.memory.set(self.registers.hl, self.rlc(self.memory.get(self.registers.hl)));
                     },
-                    0x07 => {
+                    opcode.MiscOpcode.RLC_A => {
                         // RLC A
                         self.registers.setA(self.rlc(self.registers.a()));
                     },
-                    0x08 => {
+                    opcode.MiscOpcode.RRC_B => {
                         // RRC B
                         self.registers.setB(self.rrc(self.registers.b()));
                     },
-                    0x09 => {
+                    opcode.MiscOpcode.RRC_C => {
                         // RRC C
                         self.registers.setC(self.rrc(self.registers.c()));
                     },
-                    0x0A => {
+                    opcode.MiscOpcode.RRC_D => {
                         // RRC D
                         self.registers.setD(self.rrc(self.registers.d()));
                     },
-                    0x0B => {
+                    opcode.MiscOpcode.RRC_E => {
                         // RRC E
                         self.registers.setE(self.rrc(self.registers.e()));
                     },
-                    0x0C => {
+                    opcode.MiscOpcode.RRC_H => {
                         // RRC H
                         self.registers.setH(self.rrc(self.registers.h()));
                     },
-                    0x0D => {
+                    opcode.MiscOpcode.RRC_L => {
                         // RRC L
                         self.registers.setL(self.rrc(self.registers.l()));
                     },
-                    0x0E => {
+                    opcode.MiscOpcode.RRC_HL => {
                         // RRC (HL)
                         self.memory.set(self.registers.hl, self.rrc(self.memory.get(self.registers.hl)));
                     },
-                    0x0F => {
+                    opcode.MiscOpcode.RRC_A => {
                         // RRC A
                         self.registers.setA(self.rrc(self.registers.a()));
                     },
-                    0x10 => {
+                    opcode.MiscOpcode.RL_B => {
                         // RL B
                         self.registers.setB(self.rl(self.registers.b()));
                     },
-                    0x11 => {
+                    opcode.MiscOpcode.RL_C => {
                         // RL C
                         self.registers.setC(self.rl(self.registers.c()));
                     },
-                    0x12 => {
+                    opcode.MiscOpcode.RL_D => {
                         // RL D
                         self.registers.setD(self.rl(self.registers.d()));
                     },
-                    0x13 => {
+                    opcode.MiscOpcode.RL_E => {
                         // RL E
                         self.registers.setE(self.rl(self.registers.e()));
                     },
-                    0x14 => {
+                    opcode.MiscOpcode.RL_H => {
                         // RL H
                         self.registers.setH(self.rl(self.registers.h()));
                     },
-                    0x15 => {
+                    opcode.MiscOpcode.RL_L => {
                         // RL L
                         self.registers.setL(self.rl(self.registers.l()));
                     },
-                    0x16 => {
+                    opcode.MiscOpcode.RL_HL => {
                         // RL (HL)
                         self.memory.set(self.registers.hl, self.rl(self.memory.get(self.registers.hl)));
                     },
-                    0x17 => {
+                    opcode.MiscOpcode.RL_A => {
                         // RL A
                         self.registers.setA(self.rl(self.registers.a()));
                     },
-                    0x18 => {
+                    opcode.MiscOpcode.RR_B => {
                         // RR B
                         self.registers.setB(self.rr(self.registers.b()));
                     },
-                    0x19 => {
+                    opcode.MiscOpcode.RR_C => {
                         // RR C
                         self.registers.setC(self.rr(self.registers.c()));
                     },
-                    0x1A => {
+                    opcode.MiscOpcode.RR_D => {
                         // RR D
                         self.registers.setD(self.rr(self.registers.d()));
                     },
-                    0x1B => {
+                    opcode.MiscOpcode.RR_E => {
                         // RR E
                         self.registers.setE(self.rr(self.registers.e()));
                     },
-                    0x1C => {
+                    opcode.MiscOpcode.RR_H => {
                         // RR H
                         self.registers.setH(self.rr(self.registers.h()));
                     },
-                    0x1D => {
+                    opcode.MiscOpcode.RR_L => {
                         // RR L
                         self.registers.setL(self.rr(self.registers.l()));
                     },
-                    0x1E => {
+                    opcode.MiscOpcode.RR_HL => {
                         // RR (HL)
                         self.memory.set(self.registers.hl, self.rr(self.memory.get(self.registers.hl)));
                     },
-                    0x1F => {
+                    opcode.MiscOpcode.RR_A => {
                         // RR A
                         self.registers.setA(self.rr(self.registers.a()));
                     },
-                    0x20 => {
+                    opcode.MiscOpcode.SLA_B => {
                         // SLA B
                         self.registers.setB(self.sla(self.registers.b()));
                     },
-                    0x21 => {
+                    opcode.MiscOpcode.SLA_C => {
                         // SLA C
                         self.registers.setC(self.sla(self.registers.c()));
                     },
-                    0x22 => {
+                    opcode.MiscOpcode.SLA_D => {
                         // SLA D
                         self.registers.setD(self.sla(self.registers.d()));
                     },
-                    0x23 => {
+                    opcode.MiscOpcode.SLA_E => {
                         // SLA E
                         self.registers.setE(self.sla(self.registers.e()));
                     },
-                    0x24 => {
+                    opcode.MiscOpcode.SLA_H => {
                         // SLA H
                         self.registers.setH(self.sla(self.registers.h()));
                     },
-                    0x25 => {
+                    opcode.MiscOpcode.SLA_L => {
                         // SLA L
                         self.registers.setL(self.sla(self.registers.l()));
                     },
-                    0x26 => {
+                    opcode.MiscOpcode.SLA_HL => {
                         // SLA (HL)
                         self.memory.set(self.registers.hl, self.sla(self.memory.get(self.registers.hl)));
                     },
-                    0x27 => {
+                    opcode.MiscOpcode.SLA_A => {
                         // SLA A
                         self.registers.setA(self.sla(self.registers.a()));
                     },
-                    0x28 => {
+                    opcode.MiscOpcode.SRA_B => {
                         // SRA B
                         self.registers.setB(self.sra(self.registers.b()));
                     },
-                    0x29 => {
+                    opcode.MiscOpcode.SRA_C => {
                         // SRA C
                         self.registers.setC(self.sra(self.registers.c()));
                     },
-                    0x2A => {
+                    opcode.MiscOpcode.SRA_D => {
                         // SRA D
                         self.registers.setD(self.sra(self.registers.d()));
                     },
-                    0x2B => {
+                    opcode.MiscOpcode.SRA_E => {
                         // SRA E
                         self.registers.setE(self.sra(self.registers.e()));
                     },
-                    0x2C => {
+                    opcode.MiscOpcode.SRA_H => {
                         // SRA H
                         self.registers.setH(self.sra(self.registers.h()));
                     },
-                    0x2D => {
+                    opcode.MiscOpcode.SRA_L => {
                         // SRA L
                         self.registers.setL(self.sra(self.registers.l()));
                     },
-                    0x2E => {
+                    opcode.MiscOpcode.SRA_HL => {
                         // SRA (HL)
                         self.memory.set(self.registers.hl, self.sra(self.memory.get(self.registers.hl)));
                     },
-                    0x2F => {
+                    opcode.MiscOpcode.SRA_A => {
                         // SRA A
                         self.registers.setA(self.sra(self.registers.a()));
                     },
-                    0x30 => {
+                    opcode.MiscOpcode.SWAP_B => {
                         // SWAP B
                         self.registers.setB(self.swap(self.registers.b()));
                     },
-                    0x31 => {
+                    opcode.MiscOpcode.SWAP_C => {
                         // SWAP C
                         self.registers.setC(self.swap(self.registers.c()));
                     },
-                    0x32 => {
+                    opcode.MiscOpcode.SWAP_D => {
                         // SWAP D
                         self.registers.setD(self.swap(self.registers.d()));
                     },
-                    0x33 => {
+                    opcode.MiscOpcode.SWAP_E => {
                         // SWAP E
                         self.registers.setE(self.swap(self.registers.e()));
                     },
-                    0x34 => {
+                    opcode.MiscOpcode.SWAP_H => {
                         // SWAP H
                         self.registers.setH(self.swap(self.registers.h()));
                     },
-                    0x35 => {
+                    opcode.MiscOpcode.SWAP_L => {
                         // SWAP L
                         self.registers.setL(self.swap(self.registers.l()));
                     },
-                    0x36 => {
+                    opcode.MiscOpcode.SWAP_HL => {
                         // SWAP (HL)
                         self.memory.set(self.registers.hl, self.swap(self.memory.get(self.registers.hl)));
                     },
-                    0x37 => {
+                    opcode.MiscOpcode.SWAP_A => {
                         // SWAP A
                         self.registers.setA(self.swap(self.registers.a()));
                     },
-                    0x38 => {
+                    opcode.MiscOpcode.SRL_B => {
                         // SRL B
                         self.registers.setB(self.srl(self.registers.b()));
                     },
-                    0x39 => {
+                    opcode.MiscOpcode.SRL_C => {
                         // SRL C
                         self.registers.setC(self.srl(self.registers.c()));
                     },
-                    0x3A => {
+                    opcode.MiscOpcode.SRL_D => {
                         // SRL D
                         self.registers.setD(self.srl(self.registers.d()));
                     },
-                    0x3B => {
+                    opcode.MiscOpcode.SRL_E => {
                         // SRL E
                         self.registers.setE(self.srl(self.registers.e()));
                     },
-                    0x3C => {
+                    opcode.MiscOpcode.SRL_H => {
                         // SRL H
                         self.registers.setH(self.srl(self.registers.h()));
                     },
-                    0x3D => {
+                    opcode.MiscOpcode.SRL_L => {
                         // SRL L
                         self.registers.setL(self.srl(self.registers.l()));
                     },
-                    0x3E => {
+                    opcode.MiscOpcode.SRL_HL => {
                         // SRL (HL)
                         self.memory.set(self.registers.hl, self.srl(self.memory.get(self.registers.hl)));
                     },
-                    0x3F => {
+                    opcode.MiscOpcode.SRL_A => {
                         // SRL A
                         self.registers.setA(self.srl(self.registers.a()));
                     },
-                    0x40 => {
+                    opcode.MiscOpcode.BIT_B => {
                         // BIT n,B
                         self.testBit(self.registers.b(), try self.stream.readByte());
                     },
-                    0x41 => {
+                    opcode.MiscOpcode.BIT_C => {
                         // BIT n,C
                         self.testBit(self.registers.c(), try self.stream.readByte());
                     },
-                    0x42 => {
+                    opcode.MiscOpcode.BIT_D => {
                         // BIT n,D
                         self.testBit(self.registers.d(), try self.stream.readByte());
                     },
-                    0x43 => {
+                    opcode.MiscOpcode.BIT_E => {
                         // BIT n,E
                         self.testBit(self.registers.e(), try self.stream.readByte());
                     },
-                    0x44 => {
+                    opcode.MiscOpcode.BIT_H => {
                         // BIT n,H
                         self.testBit(self.registers.h(), try self.stream.readByte());
                     },
-                    0x45 => {
+                    opcode.MiscOpcode.BIT_L => {
                         // BIT n,L
                         self.testBit(self.registers.l(), try self.stream.readByte());
                     },
-                    0x46 => {
+                    opcode.MiscOpcode.BIT_HL => {
                         // BIT n,(HL)
                         self.testBit(self.memory.get(self.registers.hl), try self.stream.readByte());
                     },
-                    0x47 => {
+                    opcode.MiscOpcode.BIT_A => {
                         // BIT n,A
                         self.testBit(self.registers.a(), try self.stream.readByte());
                     },
-                    0x80 => {
+                    opcode.MiscOpcode.RES_B => {
                         // RES n,B
                         self.registers.setB(self.registers.b() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0x81 => {
+                    opcode.MiscOpcode.RES_C => {
                         // RES n,C
                         self.registers.setC(self.registers.c() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0x82 => {
+                    opcode.MiscOpcode.RES_D => {
                         // RES n,D
                         self.registers.setD(self.registers.d() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0x83 => {
+                    opcode.MiscOpcode.RES_E => {
                         // RES n,E
                         self.registers.setE(self.registers.e() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0x84 => {
+                    opcode.MiscOpcode.RES_H => {
                         // RES n,H
                         self.registers.setH(self.registers.h() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0x85 => {
+                    opcode.MiscOpcode.RES_L => {
                         // RES n,L
                         self.registers.setL(self.registers.l() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0x86 => {
+                    opcode.MiscOpcode.RES_HL => {
                         // RES n,(HL)
                         self.memory.set(self.registers.hl, self.memory.get(self.registers.hl) & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0x87 => {
+                    opcode.MiscOpcode.RES_A => {
                         // RES n,A
                         self.registers.setA(self.registers.a() & ~(u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0xC0 => {
+                    opcode.MiscOpcode.SET_B => {
                         // SET n,B
                         self.registers.setB(self.registers.b() | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0xC1 => {
+                    opcode.MiscOpcode.SET_C => {
                         // SET n,C
                         self.registers.setC(self.registers.c() | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0xC2 => {
+                    opcode.MiscOpcode.SET_D => {
                         // SET n,D
                         self.registers.setD(self.registers.d() | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0xC3 => {
+                    opcode.MiscOpcode.SET_E => {
                         // SET n,E
                         self.registers.setE(self.registers.e() | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0xC4 => {
+                    opcode.MiscOpcode.SET_H => {
                         // SET n,H
                         self.registers.setH(self.registers.h() | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0xC5 => {
+                    opcode.MiscOpcode.SET_L => {
                         // SET n,L
                         self.registers.setL(self.registers.l() | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0xC6 => {
+                    opcode.MiscOpcode.SET_HL => {
                         // SET n,(HL)
                         self.memory.set(self.registers.hl, self.memory.get(self.registers.hl) | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
-                    0xC7 => {
+                    opcode.MiscOpcode.SET_A => {
                         // SET n,A
                         self.registers.setA(self.registers.a() | (u8(1) << @truncate(u3, try self.stream.readByte())));
                     },
                     else => {
-                        return ErrorSet.InvalidInstruction;
+                        unreachable;
                     },
                 }
             },
@@ -1806,7 +1805,7 @@ pub const CPU = struct {
                 _ = self.sub(self.registers.a(), try self.stream.readByte());
             },
             else => {
-                return ErrorSet.InvalidInstruction;
+                unreachable;
             },
         }
         return Mode.Default;
