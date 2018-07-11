@@ -238,11 +238,11 @@ pub const Opcode = enum(u8) {
     RST_28 = 0xEF,
     RST_30 = 0xF7,
     RST_38 = 0xFF,
-    RET_nn = 0xC9,
-    RET_NZ_nn = 0xC0,
-    RET_Z_nn = 0xC8,
-    RET_NC_nn = 0xD0,
-    RET_C_nn = 0xD8,
+    RET = 0xC9,
+    RET_NZ = 0xC0,
+    RET_Z = 0xC8,
+    RET_NC = 0xD0,
+    RET_C = 0xD8,
     RETI = 0xD9,
 };
 
