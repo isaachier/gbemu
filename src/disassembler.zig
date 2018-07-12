@@ -379,7 +379,7 @@ test "Disassembler" {
     var inStream = std.io.FileInStream.init(&test_rom_file);
     var outStream = std.io.FileOutStream.init(&stdout);
     var disassembler = Disassembler.init(&inStream.stream, &outStream.stream);
-    var i : i32 = 0;
+    var i: i32 = 0;
     while (i < 500) : (i += 1) {
         try disassembler.disassemble();
         try outStream.stream.write("\n");
