@@ -15,9 +15,9 @@ list can be found [here](https://github.com/avivace/awesome-gbdev).
 
 ## Roadmap
 
-[ ] CPU implementation (needs tests)
-[ ] Disassembler (needs tests)
-[ ] Assembler (optional)
-[ ] Compiler (optional)
-[ ] Video emulation
-[ ] Audio emulation
+- [ ] CPU implementation (needs tests)
+- [ ] Disassembler (needs tests)
+- [ ] Assembler (optional)
+- [ ] Compiler (optional)
+- [ ] Video emulation
+- [ ] Audio emulation
