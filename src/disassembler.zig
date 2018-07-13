@@ -3,8 +3,8 @@ const std = @import("std");
 const opcode = @import("opcode.zig");
 
 pub const Disassembler = struct {
-    const InStream = std.io.InStream(std.os.File.ReadError);
-    const OutStream = std.io.OutStream(std.os.File.WriteError);
+    const InStream = std.io.FileInStream.Stream;
+    const OutStream = std.io.FileOutStream.Stream;
 
     input: *InStream,
     output: *OutStream,
@@ -20,6 +20,7 @@ pub const Disassembler = struct {
 
     pub fn disassemble(self: *Disassembler) !void {
         const byte = self.buffer orelse try self.input.readByte();
+        self.buffer = null;
         switch (byte) {
             @enumToInt(opcode.Opcode.NOP) => try self.output.print("nop"),
             @enumToInt(opcode.Opcode.LD_A_n) => try self.output.print("ld a,${x}", try self.input.readByte()),
@@ -379,9 +380,14 @@ test "Disassembler" {
     var inStream = std.io.FileInStream.init(&test_rom_file);
     var outStream = std.io.FileOutStream.init(&stdout);
     var disassembler = Disassembler.init(&inStream.stream, &outStream.stream);
-    var i: i32 = 0;
-    while (i < 500) : (i += 1) {
-        try disassembler.disassemble();
+    while (true) {
+        disassembler.disassemble() catch |err| {
+            if (err == error.EndOfStream) {
+                break;
+            } else {
+                return err;
+            }
+        };
         try outStream.stream.write("\n");
     }
 }
