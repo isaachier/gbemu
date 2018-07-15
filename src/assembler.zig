@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const opcode = @import("opcode.zig");
+
 fn toLower(byte: u8) u8 {
     return switch (byte) {
         'A' ... 'Z' => byte - 'A',
@@ -18,7 +20,7 @@ const Tokenizer = struct {
         };
     }
 
-    pub fn next(self: *Tokenizer) !?[]const u8 {
+    pub fn next(self: *Tokenizer) ![]const u8 {
         const delims = std.cstr.line_sep ++ "\t ,";
         var buffer = std.Buffer.initNull(self.allocator);
         try buffer.resize(0);
@@ -81,64 +83,87 @@ const Instruction = enum {
     XOR,
 };
 
-fn lookupInstruction(str: []const u8) ?Instruction {
-    const instruction_strings = [][]const u8{
-        "adc",
-        "add",
-        "and",
-        "bit",
-        "call",
-        "ccf",
-        "cp",
-        "cpl",
-        "daa",
-        "dec",
-        "di",
-        "ei",
-        "halt",
-        "inc",
-        "jp",
-        "jr",
-        "ld",
-        "ldd",
-        "ldh",
-        "ldi",
-        "nop",
-        "or",
-        "pop",
-        "push",
-        "res",
-        "ret",
-        "rl",
-        "rla",
-        "rlc",
-        "rlca",
-        "rr",
-        "rra",
-        "rrc",
-        "rrca",
-        "rst",
-        "sbc",
-        "scf",
-        "set",
-        "sla",
-        "sra",
-        "srl",
-        "stop",
-        "sub",
-        "swap",
-        "xor",
-    };
-    var l: @TagType(Instruction) = 0;
-    var r = @truncate(@TagType(Instruction), instruction_strings.len - 1);
+const instruction_strings = [][]const u8{
+    "adc",
+    "add",
+    "and",
+    "bit",
+    "call",
+    "ccf",
+    "cp",
+    "cpl",
+    "daa",
+    "dec",
+    "di",
+    "ei",
+    "halt",
+    "inc",
+    "jp",
+    "jr",
+    "ld",
+    "ldd",
+    "ldh",
+    "ldi",
+    "nop",
+    "or",
+    "pop",
+    "push",
+    "res",
+    "ret",
+    "rl",
+    "rla",
+    "rlc",
+    "rlca",
+    "rr",
+    "rra",
+    "rrc",
+    "rrca",
+    "rst",
+    "sbc",
+    "scf",
+    "set",
+    "sla",
+    "sra",
+    "srl",
+    "stop",
+    "sub",
+    "swap",
+    "xor",
+};
+
+const EightBitOperand = enum {
+    A,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+    MEM_HL,
+};
+
+const eight_bit_operand_strings = [][]const u8 {
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "h",
+    "l",
+    "(hl)",
+};
+
+fn binarySearchEnumString(comptime enum_type: type, str: []const u8, array: []const[]const u8) ?enum_type {
+    var l: @TagType(enum_type) = 0;
+    var r = @truncate(@TagType(enum_type), array.len - 1);
     while (l <= r) {
         const m = (l + r) / 2;
-        if (std.mem.lessThan(u8, instruction_strings[m], str)) {
+        if (std.mem.lessThan(u8, array[m], str)) {
             l = m + 1;
-        } else if (std.mem.lessThan(u8, str, instruction_strings[m])) {
+        } else if (std.mem.lessThan(u8, str, array[m])) {
             r = m - 1;
         } else {
-            return @intToEnum(Instruction, m);
+            return @intToEnum(enum_type, m);
         }
     }
     return null;
@@ -147,6 +172,10 @@ fn lookupInstruction(str: []const u8) ?Instruction {
 pub const Assembler = struct {
     const InStream = std.io.InStream(std.os.File.ReadError);
     const OutStream = std.io.OutStream(std.os.File.WriteError);
+
+    const Error = error{
+        InvalidDestination,
+    };
 
     tokenizer: Tokenizer,
     output: *OutStream,
@@ -158,11 +187,31 @@ pub const Assembler = struct {
         };
     }
 
-    pub fn assemble(self: *Assembler) !void {
-        while (try self.tokenizer.next()) |token| {
+    pub fn assemble(self: *Assembler) !opcode.Opcode {
+        while (true) {
+            const token = try self.tokenizer.next();
             defer self.tokenizer.allocator.free(token);
-            const instruction = lookupInstruction(token).?;
-            // TODO
+            const instruction = binarySearchEnumString(Instruction, token, instruction_strings[0..]).?;
+            return switch (instruction) {
+                Instruction.ADC => blk: {
+                    const dst = try self.tokenizer.next();
+                    if (!std.mem.eql(u8, dst, "a")) {
+                        return Error.InvalidDestination;
+                    }
+                    const src = try self.tokenizer.next();
+                    break :blk switch (binarySearchEnumString(EightBitOperand, src, eight_bit_operand_strings).?) {
+                        EightBitOperand.A => opcode.Opcode.ADC_A_A,
+                        EightBitOperand.B => opcode.Opcode.ADC_A_B,
+                        EightBitOperand.C => opcode.Opcode.ADC_A_C,
+                        EightBitOperand.D => opcode.Opcode.ADC_A_D,
+                        EightBitOperand.E => opcode.Opcode.ADC_A_E,
+                        EightBitOperand.H => opcode.Opcode.ADC_A_H,
+                        EightBitOperand.L => opcode.Opcode.ADC_A_L,
+                        EightBitOperand.MEM_HL => opcode.Opcode.ADC_A_HL,
+                    };
+                },
+                else => opcode.Opcode.NOP,
+            };
         }
     }
 };
@@ -176,11 +225,12 @@ test "Assembler" {
     var outStream = std.io.FileOutStream.init(&test_output_file);
     var assembler = Assembler.init(std.debug.global_allocator, &inStream.stream, &outStream.stream);
     while (true) {
-        assembler.assemble() catch |err| {
+        const op = assembler.assemble() catch |err| {
             if (err == error.EndOfStream) {
                 break;
             }
             return err;
         };
+        std.debug.warn("op = {}\n", @tagName(op));
     }
 }
