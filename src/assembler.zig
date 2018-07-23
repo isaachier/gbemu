@@ -9,148 +9,216 @@ fn toLower(byte: u8) u8 {
     };
 }
 
-const Tokenizer = struct {
-    allocator: *std.mem.Allocator,
-    input: *Assembler.InStream,
+const Token = struct {
+    id: Id,
+    start: usize,
+    end: usize,
 
-    pub fn init(allocator: *std.mem.Allocator, input: *Assembler.InStream) Tokenizer {
+    const Keyword = union(enum) {
+        bytes: []const u8,
+        id: Id,
+    };
+
+    const keywords = []Keyword{
+        Keyword{ .bytes = "adc", .id = Id.KeywordAdc },
+        Keyword{ .bytes = "add", .id = Id.KeywordAdd },
+        Keyword{ .bytes = "and", .id = Id.KeywordAnd },
+        Keyword{ .bytes = "bit", .id = Id.KeywordBit },
+        Keyword{ .bytes = "call", .id = Id.KeywordCall },
+        Keyword{ .bytes = "ccf", .id = Id.KeywordCcf },
+        Keyword{ .bytes = "cp", .id = Id.KeywordCp },
+        Keyword{ .bytes = "cpl", .id = Id.KeywordCpl },
+        Keyword{ .bytes = "daa", .id = Id.KeywordDaa },
+        Keyword{ .bytes = "dec", .id = Id.KeywordDec },
+        Keyword{ .bytes = "di", .id = Id.KeywordDi },
+        Keyword{ .bytes = "db", .id = Id.KeywordDb },
+        Keyword{ .bytes = "dw", .id = Id.KeywordDw },
+        Keyword{ .bytes = "ei", .id = Id.KeywordEi },
+        Keyword{ .bytes = "endC", .id = Id.KeywordEndC },
+        Keyword{ .bytes = "endM", .id = Id.KeywordEndM },
+        Keyword{ .bytes = "equs", .id = Id.KeywordEqus },
+        Keyword{ .bytes = "halt", .id = Id.KeywordHalt },
+        Keyword{ .bytes = "inc", .id = Id.KeywordInc },
+        Keyword{ .bytes = "jp", .id = Id.KeywordJp },
+        Keyword{ .bytes = "jr", .id = Id.KeywordJr },
+        Keyword{ .bytes = "ld", .id = Id.KeywordLd },
+        Keyword{ .bytes = "ldd", .id = Id.KeywordLdd },
+        Keyword{ .bytes = "ldh", .id = Id.KeywordLdh },
+        Keyword{ .bytes = "ldi", .id = Id.KeywordLdi },
+        Keyword{ .bytes = "macro", .id = Id.KeywordMacro },
+        Keyword{ .bytes = "nop", .id = Id.KeywordNop },
+        Keyword{ .bytes = "or", .id = Id.KeywordOr },
+        Keyword{ .bytes = "pop", .id = Id.KeywordPop },
+        Keyword{ .bytes = "push", .id = Id.KeywordPush },
+        Keyword{ .bytes = "res", .id = Id.KeywordRes },
+        Keyword{ .bytes = "ret", .id = Id.KeywordRet },
+        Keyword{ .bytes = "rl", .id = Id.KeywordRl },
+        Keyword{ .bytes = "rla", .id = Id.KeywordRla },
+        Keyword{ .bytes = "rlc", .id = Id.KeywordRlc },
+        Keyword{ .bytes = "rlca", .id = Id.KeywordRlca },
+        Keyword{ .bytes = "rr", .id = Id.KeywordRr },
+        Keyword{ .bytes = "rra", .id = Id.KeywordRra },
+        Keyword{ .bytes = "rrc", .id = Id.KeywordRrc },
+        Keyword{ .bytes = "rrca", .id = Id.KeywordRrca },
+        Keyword{ .bytes = "rst", .id = Id.KeywordRst },
+        Keyword{ .bytes = "sbc", .id = Id.KeywordSbc },
+        Keyword{ .bytes = "scf", .id = Id.KeywordScf },
+        Keyword{ .bytes = "set", .id = Id.KeywordSet },
+        Keyword{ .bytes = "sla", .id = Id.KeywordSla },
+        Keyword{ .bytes = "sra", .id = Id.KeywordSra },
+        Keyword{ .bytes = "srl", .id = Id.KeywordSrl },
+        Keyword{ .bytes = "stop", .id = Id.KeywordStop },
+        Keyword{ .bytes = "sub", .id = Id.KeywordSub },
+        Keyword{ .bytes = "swap", .id = Id.KeywordSwap },
+        Keyword{ .bytes = "xor", .id = Id.KeywordXor },
+    };
+
+    const Id = union(enum) {
+        Eof,
+        Identifier,
+        Number,
+        MacroParam,
+        LeftParen,
+        RightParen,
+        LeftBracket,
+        RightBracket,
+        Colon,
+        Newline,
+        StringLiteral,
+        KeywordAdc,
+        KeywordAdd,
+        KeywordAnd,
+        KeywordBit,
+        KeywordCall,
+        KeywordCcf,
+        KeywordCp,
+        KeywordCpl,
+        KeywordDaa,
+        KeywordDec,
+        KeywordDi,
+        KeywordDb,
+        KeywordDw,
+        KeywordEi,
+        KeywordEndC,
+        KeywordEndM,
+        KeywordEqus,
+        KeywordHalt,
+        KeywordInc,
+        KeywordJp,
+        KeywordJr,
+        KeywordLd,
+        KeywordLdd,
+        KeywordLdh,
+        KeywordLdi,
+        KeywordMacro,
+        KeywordNop,
+        KeywordOr,
+        KeywordPop,
+        KeywordPush,
+        KeywordRes,
+        KeywordRet,
+        KeywordRl,
+        KeywordRla,
+        KeywordRlc,
+        KeywordRlca,
+        KeywordRr,
+        KeywordRra,
+        KeywordRrc,
+        KeywordRrca,
+        KeywordRst,
+        KeywordSbc,
+        KeywordScf,
+        KeywordSet,
+        KeywordSla,
+        KeywordSra,
+        KeywordSrl,
+        KeywordStop,
+        KeywordSub,
+        KeywordSwap,
+        KeywordXor,
+    };
+};
+
+const Tokenizer = struct {
+    const State = enum {
+        Default,
+        StringLiteral,
+        Identifier,
+        Newline,
+    };
+
+    buffer: []const u8,
+    index: usize,
+    pending_invalid_token: ?Token,
+
+    pub fn init(buffer: []const u8) Tokenizer {
         return Tokenizer{
-            .allocator = allocator,
-            .input = input,
+            .buffer = buffer,
+            .index = 0,
+            .pending_invalid_token = null,
         };
     }
 
-    pub fn next(self: *Tokenizer) ![]const u8 {
-        const delims = std.cstr.line_sep ++ "\t ,";
-        var buffer = std.Buffer.initNull(self.allocator);
-        try buffer.resize(0);
-        defer buffer.deinit();
-        var byte = try self.input.readByte();
-        while (std.mem.indexOfScalar(u8, delims, byte) == null) {
-            const lower = toLower(byte);
-            try buffer.appendByte(@truncate(u8, @intCast(c_uint, lower)));
-            byte = try self.input.readByte();
+    pub fn next(self: *Tokenizer) !Token {
+        if (self.pending_invalid_token) |token| {
+            self.pending_invalid_token = null;
+            return token;
         }
-        return buffer.toOwnedSlice();
+        const start_index = self.index;
+        var state = State.Default;
+        var result = Token{
+            .id = Token.Id.Eof,
+            .start = self.index,
+            .end = undefined,
+        };
+        while (self.index < self.buffer.len) : (self.index += 1) {
+            const c = self.buffer[self.index];
+            switch (state) {
+                State.Default => {
+                    switch (c) {
+                        '(' => {
+                            result.id = Token.Id.LeftParen;
+                            break;
+                        },
+                        ')' => {
+                            result.id = Token.Id.RightParen;
+                            break;
+                        },
+                        '[' => {
+                            result.id = Token.Id.LeftBracket;
+                            break;
+                        },
+                        ']' => {
+                            result.id = Token.Id.RightBracket;
+                            break;
+                        },
+                        ':' => {
+                            result.id = Token.Id.Colon;
+                            break;
+                        },
+                        ' ', '\t' => {
+                            result.start = self.index + 1;
+                        },
+                        '"' => {
+                            result.id = Token.Id.StringLiteral;
+                            state = State.StringLiteral;
+                        },
+                        std.cstr.line_sep[0] => {
+                            if (std.cstr.line_sep.len == 1) {
+                                result.id = Token.Id.Newline;
+                                break;
+                            }
+                            state = State.Newline;
+                        },
+                    }
+                },
+                State.StringLiteral => {
+                },
+                State.Identifier => {},
+                State.Newline => {},
+            }
+        }
     }
-};
-
-const Instruction = enum {
-    ADC,
-    ADD,
-    AND,
-    BIT,
-    CALL,
-    CCF,
-    CP,
-    CPL,
-    DAA,
-    DEC,
-    DI,
-    EI,
-    HALT,
-    INC,
-    JP,
-    JR,
-    LD,
-    LDD,
-    LDH,
-    LDI,
-    NOP,
-    OR,
-    POP,
-    PUSH,
-    RES,
-    RET,
-    RL,
-    RLA,
-    RLC,
-    RLCA,
-    RR,
-    RRA,
-    RRC,
-    RRCA,
-    RST,
-    SBC,
-    SCF,
-    SET,
-    SLA,
-    SRA,
-    SRL,
-    STOP,
-    SUB,
-    SWAP,
-    XOR,
-};
-
-const instruction_strings = [][]const u8{
-    "adc",
-    "add",
-    "and",
-    "bit",
-    "call",
-    "ccf",
-    "cp",
-    "cpl",
-    "daa",
-    "dec",
-    "di",
-    "ei",
-    "halt",
-    "inc",
-    "jp",
-    "jr",
-    "ld",
-    "ldd",
-    "ldh",
-    "ldi",
-    "nop",
-    "or",
-    "pop",
-    "push",
-    "res",
-    "ret",
-    "rl",
-    "rla",
-    "rlc",
-    "rlca",
-    "rr",
-    "rra",
-    "rrc",
-    "rrca",
-    "rst",
-    "sbc",
-    "scf",
-    "set",
-    "sla",
-    "sra",
-    "srl",
-    "stop",
-    "sub",
-    "swap",
-    "xor",
-};
-
-const EightBitOperand = enum {
-    A,
-    B,
-    C,
-    D,
-    E,
-    H,
-    L,
-    MEM_HL,
-};
-
-const eight_bit_operand_strings = [][]const u8 {
-    "a",
-    "b",
-    "c",
-    "d",
-    "e",
-    "h",
-    "l",
-    "(hl)",
 };
 
 fn binarySearchEnumString(comptime enum_type: type, str: []const u8, array: []const[]const u8) ?enum_type {
@@ -170,49 +238,18 @@ fn binarySearchEnumString(comptime enum_type: type, str: []const u8, array: []co
 }
 
 pub const Assembler = struct {
-    const InStream = std.io.InStream(std.os.File.ReadError);
-    const OutStream = std.io.OutStream(std.os.File.WriteError);
-
-    const Error = error{
-        InvalidDestination,
-    };
-
     tokenizer: Tokenizer,
-    output: *OutStream,
 
-    pub fn init(allocator: *std.mem.Allocator, input: *InStream, output: *OutStream) Assembler {
+    pub fn init(buffer: []const u8) Assembler {
         return Assembler{
-            .tokenizer = Tokenizer.init(allocator, input),
-            .output = output,
+            .tokenizer = Tokenizer.init(buffer),
         };
     }
 
     pub fn assemble(self: *Assembler) !opcode.Opcode {
-        while (true) {
-            const token = try self.tokenizer.next();
-            defer self.tokenizer.allocator.free(token);
-            const instruction = binarySearchEnumString(Instruction, token, instruction_strings[0..]).?;
-            return switch (instruction) {
-                Instruction.ADC => blk: {
-                    const dst = try self.tokenizer.next();
-                    if (!std.mem.eql(u8, dst, "a")) {
-                        return Error.InvalidDestination;
-                    }
-                    const src = try self.tokenizer.next();
-                    break :blk switch (binarySearchEnumString(EightBitOperand, src, eight_bit_operand_strings).?) {
-                        EightBitOperand.A => opcode.Opcode.ADC_A_A,
-                        EightBitOperand.B => opcode.Opcode.ADC_A_B,
-                        EightBitOperand.C => opcode.Opcode.ADC_A_C,
-                        EightBitOperand.D => opcode.Opcode.ADC_A_D,
-                        EightBitOperand.E => opcode.Opcode.ADC_A_E,
-                        EightBitOperand.H => opcode.Opcode.ADC_A_H,
-                        EightBitOperand.L => opcode.Opcode.ADC_A_L,
-                        EightBitOperand.MEM_HL => opcode.Opcode.ADC_A_HL,
-                    };
-                },
-                else => opcode.Opcode.NOP,
-            };
-        }
+        // TODO
+        try self.tokenizer.next();
+        return opcode.Opcode.NOP;
     }
 };
 
@@ -223,7 +260,7 @@ test "Assembler" {
     defer test_output_file.close();
     var inStream = std.io.FileInStream.init(&test_assembly_file);
     var outStream = std.io.FileOutStream.init(&test_output_file);
-    var assembler = Assembler.init(std.debug.global_allocator, &inStream.stream, &outStream.stream);
+    var assembler = Assembler.init("ld a,1");
     while (true) {
         const op = assembler.assemble() catch |err| {
             if (err == error.EndOfStream) {
