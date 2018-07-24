@@ -34,8 +34,8 @@ const Token = struct {
         Keyword{ .bytes = "db", .id = Id.KeywordDb },
         Keyword{ .bytes = "dw", .id = Id.KeywordDw },
         Keyword{ .bytes = "ei", .id = Id.KeywordEi },
-        Keyword{ .bytes = "endC", .id = Id.KeywordEndC },
-        Keyword{ .bytes = "endM", .id = Id.KeywordEndM },
+        Keyword{ .bytes = "endc", .id = Id.KeywordEndC },
+        Keyword{ .bytes = "endm", .id = Id.KeywordEndM },
         Keyword{ .bytes = "equs", .id = Id.KeywordEqus },
         Keyword{ .bytes = "halt", .id = Id.KeywordHalt },
         Keyword{ .bytes = "inc", .id = Id.KeywordInc },
@@ -50,6 +50,7 @@ const Token = struct {
         Keyword{ .bytes = "or", .id = Id.KeywordOr },
         Keyword{ .bytes = "pop", .id = Id.KeywordPop },
         Keyword{ .bytes = "push", .id = Id.KeywordPush },
+        Keyword{ .bytes = "rept", .id = Id.KeywordRept },
         Keyword{ .bytes = "res", .id = Id.KeywordRes },
         Keyword{ .bytes = "ret", .id = Id.KeywordRet },
         Keyword{ .bytes = "rl", .id = Id.KeywordRl },
@@ -83,6 +84,7 @@ const Token = struct {
         RightParen,
         LeftBracket,
         RightBracket,
+        Comma,
         Colon,
         Newline,
         StringLiteral,
@@ -116,6 +118,7 @@ const Token = struct {
         KeywordOr,
         KeywordPop,
         KeywordPush,
+        KeywordRept,
         KeywordRes,
         KeywordRet,
         KeywordRl,
@@ -170,6 +173,7 @@ const Tokenizer = struct {
         };
         while (self.index < self.buffer.len) : (self.index += 1) {
             const c = self.buffer[self.index];
+            //std.debug.warn("state = {}, c = '{c}'\n", @tagName(state), c);
             switch (state) {
                 State.Default => {
                     switch (c) {
@@ -179,22 +183,38 @@ const Tokenizer = struct {
                         },
                         '(' => {
                             result.id = Token.Id.LeftParen;
+                            result.end = self.index;
+                            self.index += 1;
                             break;
                         },
                         ')' => {
                             result.id = Token.Id.RightParen;
+                            result.end = self.index;
+                            self.index += 1;
                             break;
                         },
                         '[' => {
                             result.id = Token.Id.LeftBracket;
+                            result.end = self.index;
+                            self.index += 1;
                             break;
                         },
                         ']' => {
                             result.id = Token.Id.RightBracket;
+                            result.end = self.index;
+                            self.index += 1;
+                            break;
+                        },
+                        ',' => {
+                            result.id = Token.Id.Comma;
+                            result.end = self.index;
+                            self.index += 1;
                             break;
                         },
                         ':' => {
                             result.id = Token.Id.Colon;
+                            result.end = self.index;
+                            self.index += 1;
                             break;
                         },
                         ' ', '\t' => {
@@ -207,6 +227,8 @@ const Tokenizer = struct {
                         std.cstr.line_sep[0] => {
                             if (std.cstr.line_sep.len == 1) {
                                 result.id = Token.Id.Newline;
+                                result.end = self.index;
+                                self.index += 1;
                                 break;
                             }
                             state = State.Newline;
@@ -217,6 +239,7 @@ const Tokenizer = struct {
                         },
                         else => {
                             result.id = Token.Id.Invalid;
+                            result.end = self.index - 1;
                             break;
                         },
                     }
@@ -225,7 +248,7 @@ const Tokenizer = struct {
                     switch (c) {
                         '0' ... '9', 'A' ... 'F', 'a' ... 'f'  => {},
                         else => {
-                            self.index -= 1;
+                            result.end = self.index - 1;
                             break;
                         },
                     }
@@ -233,14 +256,14 @@ const Tokenizer = struct {
                 State.StringLiteral => {
                     switch (c) {
                         '"' => {
+                            result.end = self.index;
+                            self.index += 1;
                             break;
                         },
                         '\\' => {
                             state = State.EscapeSequence;
                         },
-                        else => {
-                            continue;
-                        },
+                        else => {},
                     }
                 },
                 State.EscapeSequence => {
@@ -256,13 +279,15 @@ const Tokenizer = struct {
                 },
                 State.Identifier => {
                     switch (c) {
-                        'A' ... 'Z', 'a' ... 'z', '0' ... '9', '_' => {
-                            continue;
-                        },
+                        'A' ... 'Z', 'a' ... 'z', '0' ... '9', '_' => {},
                         else => {
-                            self.index -= 1;
+                            result.end = self.index - 1;
                             const str = self.buffer[result.start..self.index];
-                            if (findKeyword(str)) |keyword| {
+                            var lower: [256]u8 = undefined;
+                            for (str) |byte, i| {
+                                lower[i] = toLower(byte);
+                            }
+                            if (findKeyword(lower[0..str.len])) |keyword| {
                                 result.id = keyword.id;
                             }
                             break;
@@ -273,6 +298,8 @@ const Tokenizer = struct {
                     std.debug.assert(std.cstr.line_sep.len == 2);
                     switch (c) {
                         std.cstr.line_sep[std.cstr.line_sep.len-1] => {
+                            result.end = self.index;
+                            self.index += 1;
                             break;
                         },
                         else => {
@@ -283,22 +310,37 @@ const Tokenizer = struct {
                 },
             }
         }
-        result.end = self.index;
+        if (self.index == self.buffer.len) {
+            switch (state) {
+                State.EscapeSequence => {
+                    result.id = Token.Id.Invalid;
+                },
+                else => {},
+            }
+        }
         return result;
     }
 
     fn findKeyword(str: []const u8) ?Token.Keyword {
-        var l : usize = 0;
-        var r : usize = Token.keywords.len;
-        while (l <= r) {
-            const m = (l + r) / 2;
-            if (std.mem.lessThan(u8, Token.keywords[m].bytes, str)) {
-                l = m + 1;
-            } else if (std.mem.lessThan(u8, str, Token.keywords[m].bytes)) {
-                r = if (m > 0) m - 1 else 0;
+        var first: usize = 0;
+        var last: usize = Token.keywords.len;
+        var pos: usize = undefined;
+        var count: usize = Token.keywords.len;
+        var step: usize = undefined;
+        while (count > 0) {
+            pos = first;
+            step = count / 2;
+            pos += step;
+            if (std.mem.lessThan(u8, Token.keywords[pos].bytes, str)) {
+                pos += 1;
+                first = pos;
+                count -= step + 1;
             } else {
-                return Token.keywords[m];
+                count = step;
             }
+        }
+        if (std.mem.eql(u8, Token.keywords[first].bytes, str)) {
+            return Token.keywords[first];
         }
         return null;
     }
@@ -315,7 +357,19 @@ pub const Assembler = struct {
 
     pub fn assemble(self: *Assembler) opcode.Opcode {
         // TODO
-        const token = self.tokenizer.next();
+        var i: usize = 0;
+        while (i < 100) : (i += 1) {
+            const token = self.tokenizer.next();
+            if (token.id == Token.Id.Invalid) {
+                std.debug.warn("Invalid token\n");
+                break;
+            }
+            if (token.id == Token.Id.Eof) {
+                std.debug.warn("EOF\n");
+                break;
+            }
+            std.debug.warn("{} '{}'\n", @tagName(token.id), self.tokenizer.buffer[token.start..token.end+1]);
+        }
         return opcode.Opcode.NOP;
     }
 };
@@ -325,5 +379,4 @@ test "Assembler" {
     defer std.debug.global_allocator.free(contents);
     var assembler = Assembler.init(contents);
     const op = assembler.assemble();
-    std.debug.warn("op = {}\n", @tagName(op));
 }
