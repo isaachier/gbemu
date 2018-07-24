@@ -14,12 +14,12 @@ const Token = struct {
     start: usize,
     end: usize,
 
-    const Keyword = union(enum) {
+    const Keyword = struct {
         bytes: []const u8,
         id: Id,
     };
 
-    const keywords = []Keyword{
+    const keywords = []const Keyword{
         Keyword{ .bytes = "adc", .id = Id.KeywordAdc },
         Keyword{ .bytes = "add", .id = Id.KeywordAdd },
         Keyword{ .bytes = "and", .id = Id.KeywordAnd },
@@ -73,10 +73,11 @@ const Token = struct {
         Keyword{ .bytes = "xor", .id = Id.KeywordXor },
     };
 
-    const Id = union(enum) {
+    const Id = enum {
+        Invalid,
         Eof,
         Identifier,
-        Number,
+        HexLiteral,
         MacroParam,
         LeftParen,
         RightParen,
@@ -142,28 +143,24 @@ const Token = struct {
 const Tokenizer = struct {
     const State = enum {
         Default,
+        HexLiteral,
         StringLiteral,
+        EscapeSequence,
         Identifier,
         Newline,
     };
 
     buffer: []const u8,
     index: usize,
-    pending_invalid_token: ?Token,
 
     pub fn init(buffer: []const u8) Tokenizer {
         return Tokenizer{
             .buffer = buffer,
             .index = 0,
-            .pending_invalid_token = null,
         };
     }
 
-    pub fn next(self: *Tokenizer) !Token {
-        if (self.pending_invalid_token) |token| {
-            self.pending_invalid_token = null;
-            return token;
-        }
+    pub fn next(self: *Tokenizer) Token {
         const start_index = self.index;
         var state = State.Default;
         var result = Token{
@@ -176,6 +173,10 @@ const Tokenizer = struct {
             switch (state) {
                 State.Default => {
                     switch (c) {
+                        '$' => {
+                            result.id = Token.Id.HexLiteral;
+                            state = State.HexLiteral;
+                        },
                         '(' => {
                             result.id = Token.Id.LeftParen;
                             break;
@@ -210,32 +211,98 @@ const Tokenizer = struct {
                             }
                             state = State.Newline;
                         },
+                        'a' ... 'z', 'A' ... 'Z', '_', '.' => {
+                            result.id = Token.Id.Identifier;
+                            state = State.Identifier;
+                        },
+                        else => {
+                            result.id = Token.Id.Invalid;
+                            break;
+                        },
+                    }
+                },
+                State.HexLiteral => {
+                    switch (c) {
+                        '0' ... '9', 'A' ... 'F', 'a' ... 'f'  => {},
+                        else => {
+                            self.index -= 1;
+                            break;
+                        },
                     }
                 },
                 State.StringLiteral => {
+                    switch (c) {
+                        '"' => {
+                            break;
+                        },
+                        '\\' => {
+                            state = State.EscapeSequence;
+                        },
+                        else => {
+                            continue;
+                        },
+                    }
                 },
-                State.Identifier => {},
-                State.Newline => {},
+                State.EscapeSequence => {
+                    switch (c) {
+                        'i', 'p', 'f', 'b', 'I', 'o', 'a', 't', 'P', 'C', '\\', '\'', '"', '0' => {
+                            state = State.StringLiteral;
+                        },
+                        else => {
+                            result.id = Token.Id.Invalid;
+                            break;
+                        },
+                    }
+                },
+                State.Identifier => {
+                    switch (c) {
+                        'A' ... 'Z', 'a' ... 'z', '0' ... '9', '_' => {
+                            continue;
+                        },
+                        else => {
+                            self.index -= 1;
+                            const str = self.buffer[result.start..self.index];
+                            if (findKeyword(str)) |keyword| {
+                                result.id = keyword.id;
+                            }
+                            break;
+                        },
+                    }
+                },
+                State.Newline => {
+                    std.debug.assert(std.cstr.line_sep.len == 2);
+                    switch (c) {
+                        std.cstr.line_sep[std.cstr.line_sep.len-1] => {
+                            break;
+                        },
+                        else => {
+                            result.id = Token.Id.Invalid;
+                            break;
+                        },
+                    }
+                },
             }
         }
+        result.end = self.index;
+        return result;
+    }
+
+    fn findKeyword(str: []const u8) ?Token.Keyword {
+        var l : usize = 0;
+        var r : usize = Token.keywords.len;
+        while (l <= r) {
+            const m = (l + r) / 2;
+            if (std.mem.lessThan(u8, Token.keywords[m].bytes, str)) {
+                l = m + 1;
+            } else if (std.mem.lessThan(u8, str, Token.keywords[m].bytes)) {
+                r = if (m > 0) m - 1 else 0;
+            } else {
+                return Token.keywords[m];
+            }
+        }
+        return null;
     }
 };
-
-fn binarySearchEnumString(comptime enum_type: type, str: []const u8, array: []const[]const u8) ?enum_type {
-    var l: @TagType(enum_type) = 0;
-    var r = @truncate(@TagType(enum_type), array.len - 1);
-    while (l <= r) {
-        const m = (l + r) / 2;
-        if (std.mem.lessThan(u8, array[m], str)) {
-            l = m + 1;
-        } else if (std.mem.lessThan(u8, str, array[m])) {
-            r = m - 1;
-        } else {
-            return @intToEnum(enum_type, m);
-        }
-    }
-    return null;
-}
 
 pub const Assembler = struct {
     tokenizer: Tokenizer,
@@ -246,28 +313,17 @@ pub const Assembler = struct {
         };
     }
 
-    pub fn assemble(self: *Assembler) !opcode.Opcode {
+    pub fn assemble(self: *Assembler) opcode.Opcode {
         // TODO
-        try self.tokenizer.next();
+        const token = self.tokenizer.next();
         return opcode.Opcode.NOP;
     }
 };
 
 test "Assembler" {
-    var test_assembly_file = try std.os.File.openRead(std.debug.global_allocator, "testdata/test.s");
-    var test_output_file = try std.os.File.openWrite(std.debug.global_allocator, "testdata/test.bin");
-    defer test_assembly_file.close();
-    defer test_output_file.close();
-    var inStream = std.io.FileInStream.init(&test_assembly_file);
-    var outStream = std.io.FileOutStream.init(&test_output_file);
-    var assembler = Assembler.init("ld a,1");
-    while (true) {
-        const op = assembler.assemble() catch |err| {
-            if (err == error.EndOfStream) {
-                break;
-            }
-            return err;
-        };
-        std.debug.warn("op = {}\n", @tagName(op));
-    }
+    const contents = try std.io.readFileAlloc(std.debug.global_allocator, "testdata/test.s");
+    defer std.debug.global_allocator.free(contents);
+    var assembler = Assembler.init(contents);
+    const op = assembler.assemble();
+    std.debug.warn("op = {}\n", @tagName(op));
 }
