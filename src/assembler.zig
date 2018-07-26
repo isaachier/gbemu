@@ -142,6 +142,10 @@ const Token = struct {
         KeywordSwap,
         KeywordXor,
     };
+
+    pub fn str(self: *const Token, input: []const u8) []const u8 {
+        return input[self.start..self.end];
+    }
 };
 
 const Tokenizer = struct {
@@ -171,7 +175,7 @@ const Tokenizer = struct {
         var result = Token{
             .id = Token.Id.Eof,
             .start = self.index,
-            .end = undefined,
+            .end = self.index,
         };
         while (self.index < self.buffer.len) : (self.index += 1) {
             const c = self.buffer[self.index];
@@ -184,37 +188,31 @@ const Tokenizer = struct {
                         },
                         '(' => {
                             result.id = Token.Id.LeftParen;
-                            result.end = self.index;
                             self.index += 1;
                             break;
                         },
                         ')' => {
                             result.id = Token.Id.RightParen;
-                            result.end = self.index;
                             self.index += 1;
                             break;
                         },
                         '[' => {
                             result.id = Token.Id.LeftBracket;
-                            result.end = self.index;
                             self.index += 1;
                             break;
                         },
                         ']' => {
                             result.id = Token.Id.RightBracket;
-                            result.end = self.index;
                             self.index += 1;
                             break;
                         },
                         ',' => {
                             result.id = Token.Id.Comma;
-                            result.end = self.index;
                             self.index += 1;
                             break;
                         },
                         ':' => {
                             result.id = Token.Id.Colon;
-                            result.end = self.index;
                             self.index += 1;
                             break;
                         },
@@ -236,7 +234,6 @@ const Tokenizer = struct {
                         std.cstr.line_sep[0] => {
                             if (std.cstr.line_sep.len == 1) {
                                 result.id = Token.Id.Newline;
-                                result.end = self.index;
                                 self.index += 1;
                                 break;
                             }
@@ -248,7 +245,6 @@ const Tokenizer = struct {
                         },
                         else => {
                             result.id = Token.Id.Invalid;
-                            result.end = self.index - 1;
                             break;
                         },
                     }
@@ -260,7 +256,6 @@ const Tokenizer = struct {
                             if (result.start == self.index - 1) {
                                 result.id = Token.Id.Invalid;
                             }
-                            result.end = self.index - 1;
                             break;
                         },
                     }
@@ -268,7 +263,6 @@ const Tokenizer = struct {
                 State.StringLiteral => {
                     switch (c) {
                         '"' => {
-                            result.end = self.index;
                             self.index += 1;
                             break;
                         },
@@ -293,7 +287,6 @@ const Tokenizer = struct {
                     switch (c) {
                         'A' ... 'Z', 'a' ... 'z', '0' ... '9', '_' => {},
                         else => {
-                            result.end = self.index - 1;
                             const str = self.buffer[result.start..self.index];
                             var lower: [256]u8 = undefined;
                             for (str) |byte, i| {
@@ -310,7 +303,6 @@ const Tokenizer = struct {
                     std.debug.assert(std.cstr.line_sep.len == 2);
                     switch (c) {
                         std.cstr.line_sep[std.cstr.line_sep.len-1] => {
-                            result.end = self.index;
                             self.index += 1;
                             break;
                         },
@@ -322,12 +314,14 @@ const Tokenizer = struct {
                 },
                 State.Comment => {
                     if (c == std.cstr.line_sep[0]) {
-                        result.end = self.index;
+                        self.index += 1;
                         break;
                     }
                 },
             }
         }
+
+        result.end = self.index;
         if (self.index == self.buffer.len) {
             switch (state) {
                 State.EscapeSequence => {
@@ -336,6 +330,7 @@ const Tokenizer = struct {
                 else => {},
             }
         }
+
         return result;
     }
 
@@ -368,11 +363,11 @@ pub const Macro = struct {
     tokens: []const Token,
     num_args: usize,
 
-    pub fn init(input: []const u8, tokens: []const Token) Macro {
+    pub fn init(input: []const u8, tokens: []const Token) !Macro {
         var num_args: usize = 0;
         for (tokens) |token| {
             if (token.id == Token.Id.MacroArgument) {
-                const arg_num = std.fmt.parseUnsigned(usize, input[token.start+1..token.end], 10);
+                const arg_num = try std.fmt.parseUnsigned(usize, input[token.start+1..token.end], 10);
                 if (num_args < arg_num) {
                     num_args = arg_num;
                 }
@@ -387,6 +382,13 @@ pub const Macro = struct {
 
 pub const Assembler = struct {
     const MacroMap = std.HashMap([]const u8, Macro, std.mem.hash_slice_u8, std.mem.eql_slice_u8);
+
+    const State = enum {
+        Default,
+        Identifier,
+        Label,
+        Macro,
+    };
 
     tokenizer: Tokenizer,
     macros: MacroMap,
@@ -406,22 +408,77 @@ pub const Assembler = struct {
         self.macros.deinit();
     }
 
-    pub fn assemble(self: *Assembler) opcode.Opcode {
-        // TODO
-        var i: usize = 0;
-        while (i < 100) : (i += 1) {
+    pub fn assemble(self: *Assembler) !opcode.Opcode {
+        var state = State.Default;
+        var label: Token = undefined;
+        var tokens = std.ArrayList(Token).init(self.macros.allocator);
+        defer tokens.deinit();
+        while (true) {
             const token = self.tokenizer.next();
-            if (token.id == Token.Id.Invalid) {
-                std.debug.warn("Invalid token\n");
-                break;
+            switch (token.id) {
+                Token.Id.Invalid => {
+                    std.debug.warn("Invalid token\n");
+                    break;
+                },
+                Token.Id.Eof => {
+                    std.debug.warn("EOF\n");
+                    break;
+                },
+                Token.Id.Comment => {
+                    continue;
+                },
+                else => {},
             }
-            if (token.id == Token.Id.Eof) {
-                std.debug.warn("EOF\n");
-                break;
+
+            switch (state) {
+                State.Default => {
+                    switch (token.id) {
+                        Token.Id.Identifier => {
+                            state = State.Identifier;
+                        },
+                        // TODO: Other cases
+                        else => {
+                        },
+                    }
+                },
+                State.Identifier => {
+                    switch (token.id) {
+                        Token.Id.Colon => {
+                            state = State.Label;
+                            label = token;
+                        },
+                        // TODO: Other cases
+                        else => {
+                            state = State.Default;
+                        },
+                    }
+                },
+                State.Label => {
+                    switch (token.id) {
+                        Token.Id.KeywordMacro => {
+                            state = State.Macro;
+                            tokens = std.ArrayList(Token).init(self.macros.allocator);
+                        },
+                        else => {
+                            state = State.Default;
+                        },
+                    }
+                },
+                State.Macro => {
+                    switch (token.id) {
+                        Token.Id.KeywordEndM => {
+                            state = State.Default;
+                            _ = try self.macros.put(label.str(self.tokenizer.buffer),
+                                                    try Macro.init(self.tokenizer.buffer,
+                                                                   tokens.toOwnedSlice()));
+                        },
+                        else => {},
+                    }
+                },
             }
             std.debug.warn("{}", @tagName(token.id));
             if (token.id != Token.Id.Newline) {
-                std.debug.warn(" '{}'", self.tokenizer.buffer[token.start..token.end+1]);
+                std.debug.warn(" '{}'", token.str(self.tokenizer.buffer));
             }
             std.debug.warn("\n");
         }
