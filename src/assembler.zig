@@ -4,7 +4,7 @@ const opcode = @import("opcode.zig");
 
 fn toLower(byte: u8) u8 {
     return switch (byte) {
-        'A' ... 'Z' => byte - 'A',
+        'A' ... 'Z' => byte - 'A' + 'a',
         else => byte,
     };
 }
@@ -78,8 +78,7 @@ const Token = struct {
         Invalid,
         Eof,
         Identifier,
-        HexLiteral,
-        MacroParam,
+        IntLiteral,
         LeftParen,
         RightParen,
         LeftBracket,
@@ -87,7 +86,9 @@ const Token = struct {
         Comma,
         Colon,
         Newline,
+        Comment,
         StringLiteral,
+        MacroArgument,
         KeywordAdc,
         KeywordAdd,
         KeywordAnd,
@@ -146,11 +147,12 @@ const Token = struct {
 const Tokenizer = struct {
     const State = enum {
         Default,
-        HexLiteral,
+        IntLiteral,
         StringLiteral,
         EscapeSequence,
         Identifier,
         Newline,
+        Comment,
     };
 
     buffer: []const u8,
@@ -173,13 +175,12 @@ const Tokenizer = struct {
         };
         while (self.index < self.buffer.len) : (self.index += 1) {
             const c = self.buffer[self.index];
-            //std.debug.warn("state = {}, c = '{c}'\n", @tagName(state), c);
             switch (state) {
                 State.Default => {
                     switch (c) {
                         '$' => {
-                            result.id = Token.Id.HexLiteral;
-                            state = State.HexLiteral;
+                            result.id = Token.Id.IntLiteral;
+                            state = State.IntLiteral;
                         },
                         '(' => {
                             result.id = Token.Id.LeftParen;
@@ -217,12 +218,20 @@ const Tokenizer = struct {
                             self.index += 1;
                             break;
                         },
+                        '\\' => {
+                            result.id = Token.Id.MacroArgument;
+                            state = State.IntLiteral;
+                        },
                         ' ', '\t' => {
                             result.start = self.index + 1;
                         },
                         '"' => {
                             result.id = Token.Id.StringLiteral;
                             state = State.StringLiteral;
+                        },
+                        ';' => {
+                            result.id = Token.Id.Comment;
+                            state = State.Comment;
                         },
                         std.cstr.line_sep[0] => {
                             if (std.cstr.line_sep.len == 1) {
@@ -244,10 +253,13 @@ const Tokenizer = struct {
                         },
                     }
                 },
-                State.HexLiteral => {
+                State.IntLiteral => {
                     switch (c) {
                         '0' ... '9', 'A' ... 'F', 'a' ... 'f'  => {},
                         else => {
+                            if (result.start == self.index - 1) {
+                                result.id = Token.Id.Invalid;
+                            }
                             result.end = self.index - 1;
                             break;
                         },
@@ -308,6 +320,12 @@ const Tokenizer = struct {
                         },
                     }
                 },
+                State.Comment => {
+                    if (c == std.cstr.line_sep[0]) {
+                        result.end = self.index;
+                        break;
+                    }
+                },
             }
         }
         if (self.index == self.buffer.len) {
@@ -346,13 +364,46 @@ const Tokenizer = struct {
     }
 };
 
-pub const Assembler = struct {
-    tokenizer: Tokenizer,
+pub const Macro = struct {
+    tokens: []const Token,
+    num_args: usize,
 
-    pub fn init(buffer: []const u8) Assembler {
-        return Assembler{
-            .tokenizer = Tokenizer.init(buffer),
+    pub fn init(input: []const u8, tokens: []const Token) Macro {
+        var num_args: usize = 0;
+        for (tokens) |token| {
+            if (token.id == Token.Id.MacroArgument) {
+                const arg_num = std.fmt.parseUnsigned(usize, input[token.start+1..token.end], 10);
+                if (num_args < arg_num) {
+                    num_args = arg_num;
+                }
+            }
+        }
+        return Macro{
+            .tokens = tokens,
+            .num_args = num_args,
         };
+    }
+};
+
+pub const Assembler = struct {
+    const MacroMap = std.HashMap([]const u8, Macro, std.mem.hash_slice_u8, std.mem.eql_slice_u8);
+
+    tokenizer: Tokenizer,
+    macros: MacroMap,
+
+    pub fn init(allocator: *std.mem.Allocator, input: []const u8) Assembler {
+        return Assembler{
+            .tokenizer = Tokenizer.init(input),
+            .macros = MacroMap.init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *Assembler) void {
+        var it = self.macros.iterator();
+        while (it.next()) |entry| {
+            self.macros.allocator.free(entry.key);
+        }
+        self.macros.deinit();
     }
 
     pub fn assemble(self: *Assembler) opcode.Opcode {
@@ -368,7 +419,11 @@ pub const Assembler = struct {
                 std.debug.warn("EOF\n");
                 break;
             }
-            std.debug.warn("{} '{}'\n", @tagName(token.id), self.tokenizer.buffer[token.start..token.end+1]);
+            std.debug.warn("{}", @tagName(token.id));
+            if (token.id != Token.Id.Newline) {
+                std.debug.warn(" '{}'", self.tokenizer.buffer[token.start..token.end+1]);
+            }
+            std.debug.warn("\n");
         }
         return opcode.Opcode.NOP;
     }
@@ -377,6 +432,7 @@ pub const Assembler = struct {
 test "Assembler" {
     const contents = try std.io.readFileAlloc(std.debug.global_allocator, "testdata/test.s");
     defer std.debug.global_allocator.free(contents);
-    var assembler = Assembler.init(contents);
+    var assembler = Assembler.init(std.debug.global_allocator, contents);
+    defer assembler.deinit();
     const op = assembler.assemble();
 }
