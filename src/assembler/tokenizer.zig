@@ -90,7 +90,6 @@ pub const Token = struct {
         Newline,
         Comment,
         StringLiteral,
-        MacroArgument,
         BitwiseAnd,
         BitwiseOr,
         KeywordAdc,
@@ -159,6 +158,7 @@ pub const Tokenizer = struct {
         StringLiteral,
         EscapeSequence,
         Identifier,
+        IdentifierEscape,
         Newline,
         Comment,
         LessThan,
@@ -225,10 +225,6 @@ pub const Tokenizer = struct {
                             result.id = Token.Id.Colon;
                             self.index += 1;
                             break;
-                        },
-                        '\\' => {
-                            result.id = Token.Id.MacroArgument;
-                            state = State.IntLiteral;
                         },
                         ' ', '\t' => {
                             result.start = self.index + 1;
@@ -300,7 +296,7 @@ pub const Tokenizer = struct {
                 },
                 State.EscapeSequence => {
                     switch (c) {
-                        'i', 'p', 'f', 'b', 'I', 'o', 'a', 't', 'P', 'C', '\\', '\'', '"', '0' => {
+                        '\\', '"', ',', '{', '}', 'n', 't', '1' ... '9', '@' => {
                             state = State.StringLiteral;
                         },
                         else => {
@@ -311,7 +307,10 @@ pub const Tokenizer = struct {
                 },
                 State.Identifier => {
                     switch (c) {
-                        'A' ... 'Z', 'a' ... 'z', '0' ... '9', '_' => {},
+                        'A' ... 'Z', 'a' ... 'z', '_' => {},
+                        '\\' => {
+                            state = State.IdentifierEscape;
+                        },
                         else => {
                             const str = self.buffer[result.start..self.index];
                             var lower: [256]u8 = undefined;
@@ -321,6 +320,17 @@ pub const Tokenizer = struct {
                             if (findKeyword(lower[0..str.len])) |keyword| {
                                 result.id = keyword.id;
                             }
+                            break;
+                        },
+                    }
+                },
+                State.IdentifierEscape => {
+                    switch (c) {
+                        '1' ... '9', '@' => {
+                            state = State.Identifier;
+                        },
+                        else => {
+                            result.id = Token.Id.Invalid;
                             break;
                         },
                     }

@@ -5,34 +5,6 @@ const tokenizer = @import("tokenizer.zig");
 const Token = tokenizer.Token;
 const Tokenizer = tokenizer.Tokenizer;
 
-pub const Macro = struct {
-    allocator: *std.mem.Allocator,
-    tokens: []const Token,
-    num_args: usize,
-
-    pub fn init(allocator: *std.mem.Allocator, input: []const u8, tokens: []const Token) !Macro {
-        var num_args: usize = 0;
-        for (tokens) |token| {
-            if (token.id == Token.Id.MacroArgument) {
-                const arg_num = try std.fmt.parseUnsigned(usize, input[token.start+1..token.end], 10);
-                if (num_args < arg_num) {
-                    num_args = arg_num;
-                }
-            }
-        }
-        return Macro{
-            .allocator = allocator,
-            .tokens = tokens,
-            .num_args = num_args,
-        };
-    }
-
-    pub fn deinit(self: *Macro) void {
-        self.allocator.free(self.tokens);
-        self.* = undefined;
-    }
-};
-
 pub const Assembler = struct {
     const MacroMap = std.HashMap([]const u8, Macro, std.mem.hash_slice_u8, std.mem.eql_slice_u8);
 
@@ -46,9 +18,9 @@ pub const Assembler = struct {
     tokenizer: Tokenizer,
     macros: MacroMap,
 
-    pub fn init(allocator: *std.mem.Allocator, input: []const u8) Assembler {
+    pub fn init(allocator: *std.mem.Allocator, buffer: []const u8) Assembler {
         return Assembler{
-            .tokenizer = Tokenizer.init(input),
+            .tokenizer = Tokenizer.init(buffer),
             .macros = MacroMap.init(allocator),
         };
     }
@@ -114,36 +86,6 @@ pub const Assembler = struct {
                         },
                         else => {
                             state = State.Default;
-                        },
-                    }
-                },
-                State.Macro => {
-                    switch (token.id) {
-                        Token.Id.KeywordEndM => {
-                            state = State.Default;
-                            var token_slice = tokens.toOwnedSlice();
-                            errdefer self.macros.allocator.free(token_slice);
-                            var old_value = try self.macros.put(label.str(self.tokenizer.buffer),
-                                                                try Macro.init(
-                                                                    self.macros.allocator,
-                                                                    self.tokenizer.buffer,
-                                                                    token_slice));
-                            if (old_value) |*macro| {
-                                macro.deinit();
-                            }
-                            std.debug.warn("Macro {} =>", label.str(self.tokenizer.buffer));
-                            var first = true;
-                            for (token_slice) |macro_token| {
-                                if (first) {
-                                    first = false;
-                                } else {
-                                    std.debug.warn(",");
-                                }
-                                std.debug.warn(" '{}'", macro_token.str(self.tokenizer.buffer));
-                            }
-                        },
-                        else => {
-                            try tokens.append(token);
                         },
                     }
                 },
