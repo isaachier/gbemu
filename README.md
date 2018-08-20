@@ -13,11 +13,14 @@ emulating a Game Boy, I wanted to test out the power of Zig on a major project.
 There are many resources dedicated to Game Boy emulator development. A great
 list can be found [here](https://github.com/avivace/awesome-gbdev).
 
+## Assembler/Compiler
+
+gbemu does not contain an assembler nor a compiler at this time. I highly
+recommend using RGBDS for Game Boy development.
+
 ## Roadmap
 
-- [ ] CPU implementation (needs tests)
-- [ ] Disassembler (needs tests)
-- [ ] Assembler (optional)
-- [ ] Compiler (optional)
+- [x] CPU implementation
+- [x] Disassembler
 - [ ] Video emulation
 - [ ] Audio emulation
