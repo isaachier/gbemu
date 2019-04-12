@@ -3,8 +3,8 @@ const std = @import("std");
 const opcode = @import("opcode.zig");
 
 pub const Disassembler = struct {
-    const InStream = std.io.FileInStream.Stream;
-    const OutStream = std.io.FileOutStream.Stream;
+    const InStream = std.io.InStream(std.os.File.ReadError);
+    const OutStream = std.io.OutStream(std.os.File.WriteError);
 
     input: *InStream,
     output: *OutStream,
@@ -89,7 +89,7 @@ pub const Disassembler = struct {
             @enumToInt(opcode.Opcode.LD_HL_n) => try self.output.print("ld (hl),${x}", try self.input.readByte()),
             @enumToInt(opcode.Opcode.LD_A_BC) => try self.output.print("ld a,(bc)"),
             @enumToInt(opcode.Opcode.LD_A_DE) => try self.output.print("ld a,(de)"),
-            @enumToInt(opcode.Opcode.LD_A_nn) => try self.output.print("ld a,(${x})", try self.input.readIntLe(u16)),
+            @enumToInt(opcode.Opcode.LD_A_nn) => try self.output.print("ld a,(${x})", try self.input.readIntLittle(u16)),
             @enumToInt(opcode.Opcode.LD_B_A) => try self.output.print("ld b,a"),
             @enumToInt(opcode.Opcode.LD_C_A) => try self.output.print("ld c,a"),
             @enumToInt(opcode.Opcode.LD_D_A) => try self.output.print("ld d,a"),
@@ -99,7 +99,7 @@ pub const Disassembler = struct {
             @enumToInt(opcode.Opcode.LD_BC_A) => try self.output.print("ld (bc),a"),
             @enumToInt(opcode.Opcode.LD_DE_A) => try self.output.print("ld (de),a"),
             @enumToInt(opcode.Opcode.LD_HL_A) => try self.output.print("ld (hl),a"),
-            @enumToInt(opcode.Opcode.LD_nn_A) => try self.output.print("ld (${x}),a", try self.input.readIntLe(u16)),
+            @enumToInt(opcode.Opcode.LD_nn_A) => try self.output.print("ld (${x}),a", try self.input.readIntLittle(u16)),
             @enumToInt(opcode.Opcode.LD_A_mem_C) => try self.output.print("ld a,($FF00 + c)"),
             @enumToInt(opcode.Opcode.LD_mem_C_A) => try self.output.print("ld ($FF00 + c),a"),
             @enumToInt(opcode.Opcode.LDD_A_HL) => try self.output.print("ldd a,(hl)"),
@@ -108,13 +108,13 @@ pub const Disassembler = struct {
             @enumToInt(opcode.Opcode.LDI_HL_A) => try self.output.print("ldi (hl),a"),
             @enumToInt(opcode.Opcode.LDH_n_A) => try self.output.print("ld ${x},a", u16(0xFF00) | try self.input.readByte()),
             @enumToInt(opcode.Opcode.LDH_A_n) => try self.output.print("ld a,${x}", try self.input.readByte()),
-            @enumToInt(opcode.Opcode.LD_BC_nn) => try self.output.print("ld bc,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.LD_DE_nn) => try self.output.print("ld de,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.LD_HL_nn) => try self.output.print("ld hl,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.LD_SP_nn) => try self.output.print("ld sp,${x}", try self.input.readIntLe(u16)),
+            @enumToInt(opcode.Opcode.LD_BC_nn) => try self.output.print("ld bc,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.LD_DE_nn) => try self.output.print("ld de,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.LD_HL_nn) => try self.output.print("ld hl,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.LD_SP_nn) => try self.output.print("ld sp,${x}", try self.input.readIntLittle(u16)),
             @enumToInt(opcode.Opcode.LD_SP_HL) => try self.output.print("ld sp,hl"),
             @enumToInt(opcode.Opcode.LDHL_SP_n) => try self.output.print("ld hl,sp+${x}", try self.input.readByteSigned()),
-            @enumToInt(opcode.Opcode.LD_nn_SP) => try self.output.print("ld (${x}),sp", try self.input.readIntLe(u16)),
+            @enumToInt(opcode.Opcode.LD_nn_SP) => try self.output.print("ld (${x}),sp", try self.input.readIntLittle(u16)),
             @enumToInt(opcode.Opcode.PUSH_AF) => try self.output.print("push af"),
             @enumToInt(opcode.Opcode.PUSH_BC) => try self.output.print("push bc"),
             @enumToInt(opcode.Opcode.PUSH_DE) => try self.output.print("push de"),
@@ -244,22 +244,22 @@ pub const Disassembler = struct {
             @enumToInt(opcode.Opcode.RLA) => try self.output.print("rla"),
             @enumToInt(opcode.Opcode.RRCA) => try self.output.print("rrca"),
             @enumToInt(opcode.Opcode.RRA) => try self.output.print("rra"),
-            @enumToInt(opcode.Opcode.JP_nn) => try self.output.print("jp ${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.JP_NZ_nn) => try self.output.print("jp nz,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.JP_Z_nn) => try self.output.print("jp z,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.JP_NC_nn) => try self.output.print("jp nc,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.JP_C_nn) => try self.output.print("jp c,${x}", try self.input.readIntLe(u16)),
+            @enumToInt(opcode.Opcode.JP_nn) => try self.output.print("jp ${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.JP_NZ_nn) => try self.output.print("jp nz,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.JP_Z_nn) => try self.output.print("jp z,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.JP_NC_nn) => try self.output.print("jp nc,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.JP_C_nn) => try self.output.print("jp c,${x}", try self.input.readIntLittle(u16)),
             @enumToInt(opcode.Opcode.JP_HL) => try self.output.print("jp (HL)"),
             @enumToInt(opcode.Opcode.JR_n) => try self.output.print("jr ${x}", try self.input.readByteSigned()),
             @enumToInt(opcode.Opcode.JR_NZ_n) => try self.output.print("jr nz,${x}", try self.input.readByteSigned()),
             @enumToInt(opcode.Opcode.JR_Z_n) => try self.output.print("jr z,${x}", try self.input.readByteSigned()),
             @enumToInt(opcode.Opcode.JR_NC_n) => try self.output.print("jr nc,${x}", try self.input.readByteSigned()),
             @enumToInt(opcode.Opcode.JR_C_n) => try self.output.print("jr c,${x}", try self.input.readByteSigned()),
-            @enumToInt(opcode.Opcode.CALL_nn) => try self.output.print("call ${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.CALL_NZ_nn) => try self.output.print("call nz,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.CALL_Z_nn) => try self.output.print("call z,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.CALL_NC_nn) => try self.output.print("call nc,${x}", try self.input.readIntLe(u16)),
-            @enumToInt(opcode.Opcode.CALL_C_nn) => try self.output.print("call c,${x}", try self.input.readIntLe(u16)),
+            @enumToInt(opcode.Opcode.CALL_nn) => try self.output.print("call ${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.CALL_NZ_nn) => try self.output.print("call nz,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.CALL_Z_nn) => try self.output.print("call z,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.CALL_NC_nn) => try self.output.print("call nc,${x}", try self.input.readIntLittle(u16)),
+            @enumToInt(opcode.Opcode.CALL_C_nn) => try self.output.print("call c,${x}", try self.input.readIntLittle(u16)),
             @enumToInt(opcode.Opcode.RST_00) => try self.output.print("rst $00"),
             @enumToInt(opcode.Opcode.RST_08) => try self.output.print("rst $08"),
             @enumToInt(opcode.Opcode.RST_10) => try self.output.print("rst $10"),
@@ -374,12 +374,12 @@ pub const Disassembler = struct {
 };
 
 test "Disassembler" {
-    var test_rom_file = try std.os.File.openRead(std.debug.global_allocator, "testdata/sprite_priority.gb");
+    var test_rom_file = try std.os.File.openRead("testdata/sprite_priority.gb");
     defer test_rom_file.close();
     var stdout = try std.io.getStdOut();
-    var inStream = std.io.FileInStream.init(&test_rom_file);
-    var outStream = std.io.FileOutStream.init(&stdout);
-    var disassembler = Disassembler.init(&inStream.stream, &outStream.stream);
+    var buffered_in_stream = std.io.BufferedInStream(std.os.File.ReadError).init(&test_rom_file.inStream().stream);
+    var buffered_out_stream = std.io.BufferedOutStream(std.os.File.WriteError).init(&stdout.outStream().stream);
+    var disassembler = Disassembler.init(&buffered_in_stream.stream, &buffered_out_stream.stream);
     while (true) {
         disassembler.disassemble() catch |err| {
             if (err == error.EndOfStream) {
@@ -388,6 +388,6 @@ test "Disassembler" {
                 return err;
             }
         };
-        try outStream.stream.write("\n");
+        try stdout.write("\n");
     }
 }
