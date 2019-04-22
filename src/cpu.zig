@@ -16,7 +16,7 @@ pub const Registers = struct {
     }
 
     pub fn setA(self: *Registers, value: u8) void {
-        return self.af = (u16(value) << 8) | self.f();
+        self.af = (u16(value) << 8) | self.f();
     }
 
     pub fn b(self: *const Registers) u8 {
@@ -24,7 +24,7 @@ pub const Registers = struct {
     }
 
     pub fn setB(self: *Registers, value: u8) void {
-        return self.bc = (u16(value) << 8) | self.c();
+        self.bc = (u16(value) << 8) | self.c();
     }
 
     pub fn c(self: *const Registers) u8 {
@@ -32,7 +32,7 @@ pub const Registers = struct {
     }
 
     pub fn setC(self: *Registers, value: u8) void {
-        return self.bc = (u16(self.b()) << 8) | value;
+        self.bc = (u16(self.b()) << 8) | value;
     }
 
     pub fn d(self: *const Registers) u8 {
@@ -40,7 +40,7 @@ pub const Registers = struct {
     }
 
     pub fn setD(self: *Registers, value: u8) void {
-        return self.de = (u16(value) << 8) | self.e();
+        self.de = (u16(value) << 8) | self.e();
     }
 
     pub fn e(self: *const Registers) u8 {
@@ -48,7 +48,7 @@ pub const Registers = struct {
     }
 
     pub fn setE(self: *Registers, value: u8) void {
-        return self.de = (u16(self.d()) << 8) | value;
+        self.de = (u16(self.d()) << 8) | value;
     }
 
     pub fn f(self: *const Registers) u8 {
@@ -56,7 +56,7 @@ pub const Registers = struct {
     }
 
     pub fn setF(self: *Registers, value: u8) void {
-        return self.af = (u16(self.a()) << 8) | value;
+        self.af = (u16(self.a()) << 8) | value;
     }
 
     pub fn h(self: *const Registers) u8 {
@@ -64,7 +64,7 @@ pub const Registers = struct {
     }
 
     pub fn setH(self: *Registers, value: u8) void {
-        return self.hl = (u16(value) << 8) | self.l();
+        self.hl = (u16(value) << 8) | self.l();
     }
 
     pub fn l(self: *const Registers) u8 {
@@ -72,7 +72,7 @@ pub const Registers = struct {
     }
 
     pub fn setL(self: *Registers, value: u8) void {
-        return self.hl = (u16(self.h()) << 8) | value;
+        self.hl = (u16(self.h()) << 8) | value;
     }
 
     const zero_flag_mask: u8 = 0x80;
@@ -250,11 +250,11 @@ pub const CPU = struct {
     fn push(self: *CPU, value: var) void {
         const len = @sizeOf(@typeOf(value));
         self.registers.sp -%= len;
-        std.mem.writeInt(self.memory.slice(self.registers.sp, len), value, builtin.Endian.Little);
+        std.mem.writeIntSliceLittle(@typeOf(value), self.memory.slice(self.registers.sp, len), value);
     }
 
     fn pop(self: *CPU, comptime T: type) T {
-        const value = std.mem.readIntLE(T, self.memory.sliceConst(self.registers.sp, @sizeOf(T)));
+        const value = std.mem.readIntSliceLittle(T, self.memory.sliceConst(self.registers.sp, @sizeOf(T)));
         self.registers.sp +%= @sizeOf(T);
         return value;
     }
@@ -416,7 +416,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.LD_BC_nn => {
                 // LD BC,nn
-                self.registers.bc = try self.stream.readIntLe(u16);
+                self.registers.bc = try self.stream.readIntLittle(u16);
             },
             opcode.Opcode.LD_BC_A => {
                 // LD (BC),A
@@ -444,7 +444,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.LD_nn_SP => {
                 // LD (nn),SP
-                const value = try self.stream.readIntLe(u16);
+                const value = try self.stream.readIntLittle(u16);
                 self.memory.set(value, @truncate(u8, (self.registers.sp & 0xFF00) >> 8));
                 self.memory.set(value + 1, @truncate(u8, self.registers.sp));
             },
@@ -489,7 +489,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.LD_DE_nn => {
                 // LD DE,nn
-                self.registers.de = try self.stream.readIntLe(u16);
+                self.registers.de = try self.stream.readIntLittle(u16);
             },
             opcode.Opcode.LD_DE_A => {
                 // LD (DE),A
@@ -557,7 +557,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.LD_HL_nn => {
                 // LD HL,nn
-                self.registers.hl = try self.stream.readIntLe(u16);
+                self.registers.hl = try self.stream.readIntLittle(u16);
             },
             opcode.Opcode.LDI_HL_A => {
                 // LDI (HL),A
@@ -650,7 +650,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.LD_SP_nn => {
                 // LD SP,nn
-                self.registers.sp = try self.stream.readIntLe(u16);
+                self.registers.sp = try self.stream.readIntLittle(u16);
             },
             opcode.Opcode.LDD_HL_A => {
                 // LDD (HL),A
@@ -1225,7 +1225,7 @@ pub const CPU = struct {
                 // CP A,A
                 _ = self.sub(self.registers.a(), self.registers.a());
             },
-            opcode.Opcode.RET_NZ_nn => {
+            opcode.Opcode.RET_NZ => {
                 // RET NZ
                 if (!self.registers.zeroFlag()) {
                     self.registers.pc = self.pop(u16);
@@ -1237,19 +1237,19 @@ pub const CPU = struct {
             },
             opcode.Opcode.JP_NZ_nn => {
                 // JP NZ,nn
-                const address = try self.stream.readIntLe(u16);
+                const address = try self.stream.readIntLittle(u16);
                 if (!self.registers.zeroFlag()) {
                     self.registers.pc = address;
                 }
             },
             opcode.Opcode.JP_nn => {
                 // JP
-                self.registers.pc = try self.stream.readIntLe(u16);
+                self.registers.pc = try self.stream.readIntLittle(u16);
             },
             opcode.Opcode.CALL_NZ_nn => {
                 // CALL NZ,nn
                 if (!self.registers.zeroFlag()) {
-                    self.call(try self.stream.readIntLe(u16));
+                    self.call(try self.stream.readIntLittle(u16));
                 }
             },
             opcode.Opcode.PUSH_BC => {
@@ -1274,19 +1274,19 @@ pub const CPU = struct {
                     else => unreachable,
                 };
             },
-            opcode.Opcode.RET_Z_nn => {
+            opcode.Opcode.RET_Z => {
                 // RET Z
                 if (self.registers.zeroFlag()) {
                     self.registers.pc = self.pop(u16);
                 }
             },
-            opcode.Opcode.RET_nn => {
+            opcode.Opcode.RET => {
                 // RET
                 self.registers.pc = self.pop(u16);
             },
             opcode.Opcode.JP_Z_nn => {
                 // JP Z,nn
-                const address = try self.stream.readIntLe(u16);
+                const address = try self.stream.readIntLittle(u16);
                 if (self.registers.zeroFlag()) {
                     self.registers.pc = address;
                 }
@@ -1653,18 +1653,18 @@ pub const CPU = struct {
             opcode.Opcode.CALL_Z_nn => {
                 // CALL Z,nn
                 if (self.registers.zeroFlag()) {
-                    self.call(try self.stream.readIntLe(u16));
+                    self.call(try self.stream.readIntLittle(u16));
                 }
             },
             opcode.Opcode.CALL_nn => {
                 // CALL nn
-                self.call(try self.stream.readIntLe(u16));
+                self.call(try self.stream.readIntLittle(u16));
             },
             opcode.Opcode.ADD_A_n => {
                 // ADC A,n
                 self.registers.setA(self.add(u8, self.registers.a(), (try self.stream.readByte()) + @boolToInt(self.registers.carryFlag())));
             },
-            opcode.Opcode.RET_NC_nn => {
+            opcode.Opcode.RET_NC => {
                 // RET NC
                 if (!self.registers.carryFlag()) {
                     self.registers.pc = self.pop(u16);
@@ -1676,7 +1676,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.JP_NC_nn => {
                 // JP NC,nn
-                const address = try self.stream.readIntLe(u16);
+                const address = try self.stream.readIntLittle(u16);
                 if (!self.registers.carryFlag()) {
                     self.registers.pc = address;
                 }
@@ -1684,7 +1684,7 @@ pub const CPU = struct {
             opcode.Opcode.CALL_NC_nn => {
                 // CALL NC,nn
                 if (!self.registers.carryFlag()) {
-                    self.call(try self.stream.readIntLe(u16));
+                    self.call(try self.stream.readIntLittle(u16));
                 }
             },
             opcode.Opcode.PUSH_DE => {
@@ -1695,7 +1695,7 @@ pub const CPU = struct {
                 // SUB A,n
                 self.registers.setA(self.sub(self.registers.a(), try self.stream.readByte()));
             },
-            opcode.Opcode.RET_C_nn => {
+            opcode.Opcode.RET_C => {
                 // RET C
                 if (self.registers.carryFlag()) {
                     self.registers.pc = self.pop(u16);
@@ -1708,7 +1708,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.JP_C_nn => {
                 // JP C,nn
-                const address = try self.stream.readIntLe(u16);
+                const address = try self.stream.readIntLittle(u16);
                 if (self.registers.carryFlag()) {
                     self.registers.pc = address;
                 }
@@ -1716,7 +1716,7 @@ pub const CPU = struct {
             opcode.Opcode.CALL_C_nn => {
                 // CALL C,nn
                 if (self.registers.carryFlag()) {
-                    self.call(try self.stream.readIntLe(u16));
+                    self.call(try self.stream.readIntLittle(u16));
                 }
             },
             opcode.Opcode.SUB_A_n => {
@@ -1753,7 +1753,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.LD_nn_A => {
                 // LD (nn),A
-                self.memory.set(try self.stream.readIntLe(u16), self.registers.a());
+                self.memory.set(try self.stream.readIntLittle(u16), self.registers.a());
             },
             opcode.Opcode.XOR_A_n => {
                 // XOR A,n
@@ -1794,7 +1794,7 @@ pub const CPU = struct {
             },
             opcode.Opcode.LD_A_nn => {
                 // LD A,(HL)
-                const address = try self.stream.readIntLe(u16);
+                const address = try self.stream.readIntLittle(u16);
                 self.registers.setA(self.memory.get(address));
             },
             opcode.Opcode.EI => {
