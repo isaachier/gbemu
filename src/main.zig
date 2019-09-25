@@ -29,4 +29,5 @@ pub fn main() !void {
     }
     defer c.SDL_DestroyWindow(window);
     const screen = c.SDL_GetWindowSurface(window);
+    std.os.nanosleep(5, 0);
 }
